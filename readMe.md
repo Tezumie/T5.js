@@ -23,7 +23,11 @@ T5.js serves as an alternative to p5.js, not a full replacement. If you're looki
 
 ### Installation
 
-You can include T5.js in your project by downloading the library and adding it to your HTML file:
+The quickest way to start using T5.js is with the aijs.io browser-based code editor.
+
+Follow [this link](https://aijs.io/editor?user=Tezumie&project=T5JS) to open this entire GitHub repository in a browser-based code editor. Then, simply press the play button to see your sketch in action.
+
+You can also include T5.js in your own project by downloading the library and adding it to your HTML file:
 
 ```html
 <!DOCTYPE html>
@@ -115,6 +119,9 @@ Attribution is already included at the top of the library.
  * For more details, see the full license at https://creativecommons.org/licenses/by-nc/4.0/
  */
  ```
+
+
+
 
 
 
