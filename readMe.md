@@ -10,7 +10,7 @@ T5.js is a lightweight and simplified 2D graphics library designed for drawing t
 
 T5.js does not use any code from p5.js and is not affiliated with it. p5.js has some functionalities that T5.js does not yet have. If you're looking for a larger library with increased capabilities, check out [p5.js](https://github.com/processing/p5.js/tree/main).
 
-T5.js serves as an alternative to p5.js, not a full replacement. If you're looking for a lightweight replacement for p5.js, check out [Q5.js](https://github.com/quinton-ashley/q5.js](https://github.com/quinton-ashley/q5.js).
+T5.js serves as an alternative to p5.js, not a full replacement. If you're looking for a lightweight replacement for p5.js, check out [Q5.js](https://github.com/quinton-ashley/q5.js).
 
 ## Features
 
