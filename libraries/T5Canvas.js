@@ -676,7 +676,7 @@ class T5Canvas {
     }
 
     translate(x, y) {
-        this.context.translate(x, y);
+        this.context.translate(this._scaleCoordinate(x), this._scaleCoordinate(y));
     }
 
     rotate(angle) {
