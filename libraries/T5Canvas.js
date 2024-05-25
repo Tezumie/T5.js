@@ -1,16 +1,7 @@
 /*!
- * T5.js - A lightweight 2D graphics library
- * 
- * Copyright (c) [2024] [Tezumie-aijs.io]
- * 
- * This library is licensed under the Creative Commons Attribution-NonCommercial 4.0 International License.
- * You can use and modify T5 in any project you make or sell, but you can't sell T5 itself.
- * 
- * NonCommercial: You can use T5 for non-commercial purposes only. You can’t sell the T5 library itself, but you can use it as part of your applications, which you can sell.
- * 
- * Attribution: You must give appropriate credit, provide a link to the license, and indicate if changes were made.
- * 
- * For more details, see the full license at https://creativecommons.org/licenses/by-nc/4.0/
+ * © 2024 Tezumie-aijs.io
+ * Licensed under CC BY-NC 4.0
+ * https://creativecommons.org/licenses/by-nc/4.0/
  */
 
 //**********************************************************************//
