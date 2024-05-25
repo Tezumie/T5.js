@@ -307,6 +307,7 @@ class T5Canvas {
         const checkReady = () => {
             if (this.assetsLoadedCount === this.assetsToLoad) {
                 if (typeof setup === 'function') setup();
+                this.strokeWidth = this._scaleCoordinate(this.strokeWidth);
                 this.initialized = true;
                 if (typeof draw === 'function') {
                     if (this.loopActive) {
