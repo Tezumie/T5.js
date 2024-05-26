@@ -1641,9 +1641,18 @@ class T5Element {
 
     value(value) {
         if (value === undefined) {
-            return this.element.value;
+            return Number(this.element.value);
         } else {
             this.element.value = value;
+            return this;
+        }
+    }
+
+    checked(checked) {
+        if (checked === undefined) {
+            return this.element.checked;
+        } else {
+            this.element.checked = checked;
             return this;
         }
     }
@@ -1694,6 +1703,10 @@ class T5Element {
 
     remove() {
         this.element.remove();
+    }
+
+    input(callback) {
+        return this._addEventListener('input', callback), this;
     }
 }
 
@@ -1755,7 +1768,7 @@ class T5Dom {
     }
     createCheckbox(label, checked) {
         const checkbox = this.createElement('input');
-        checkbox.attribute('type', 'checkbox').attribute('checked', checked);
+        checkbox.attribute('type', 'checkbox').checked(checked);
         const labelEl = this.createElement('label', label);
         labelEl.element.appendChild(checkbox.element);
         return checkbox;
@@ -1841,6 +1854,7 @@ const createVideo = (src) => myT5Dom.createVideo(src);
 const createAudio = (src) => myT5Dom.createAudio(src);
 const createCapture = () => myT5Dom.createCapture();
 const createElement = (tag, html) => myT5Dom.createElement(tag, html);
+
 
 //*************************************************************************//
 //********************************-T5Input-********************************//
