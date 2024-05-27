@@ -902,7 +902,7 @@ class T5Canvas {
 function windowResized() { }
 // T5 instance
 const myT5 = new T5Canvas();
-
+myT5.strokeWidth = myT5._scaleCoordinate(myT5.strokeWidth);
 const registerWindowResized = (callback) => myT5.windowResized(callback);
 const resizeCanvas = (width, height) => myT5.resizeCanvas(width, height);
 const frameRate = (value) => myT5.frameRate(value);
