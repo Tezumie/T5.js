@@ -6,14 +6,14 @@
 
 ## Overview
 
-T5.js is a lightweight and simplified 2D graphics library designed for drawing to the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead.
+T5.js is a lightweight and simplified 2D graphics library designed for drawing on the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead.
 
-T5.js does not use any code from p5.js and is not affiliated with it. p5.js has some functionalities that T5.js does not yet have. If you're looking for a larger library with increased capabilities, check out [p5.js](https://github.com/processing/p5.js/tree/main).
+In addition to T5.js, I'm also a developer on [Q5.js](https://github.com/quinton-ashley/q5.js), a more fully-fledged library that brings some of the unique functionalities from T5.js, such as dimension-agnostic mode, and all of the 2dcanvas functionalities of p5, into a more comprehensive package. Q5.js serves as a robust alternative for those looking for a lightweight yet powerful replacement for p5.js.
 
-T5.js serves as an alternative to p5.js, not a full replacement. If you're looking for a lightweight replacement for p5.js, check out [Q5.js](https://github.com/quinton-ashley/q5.js).
+T5.js does not use any code from p5.js and is not affiliated with it. p5.js has some functionalities such as WEBGL that T5.js does not yet have. If you're looking for a larger but slower library, check out [p5.js](https://github.com/processing/p5.js/tree/main).
+
 
 ## Features
-
 - Easy-to-use API similar to p5.js
 - Built-in dimension agnostic option
 - Optimized for performance
