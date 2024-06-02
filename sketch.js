@@ -3,7 +3,7 @@ let aspectRatio = 3 / 4;
 function setup() {
   createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
   // Scale all drawing operations automatically to any window size
-  dimensionAgnostic(true, 1000); // Canvas is 1000 units wide
+  flexibleCanvas(1000); // Canvas is 1000 units wide and Dimension Agnostic
 }
 
 function draw() {
