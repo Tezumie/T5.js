@@ -61,7 +61,7 @@ let aspectRatio = 3 / 4;
 
 function setup() {
   createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
-  dimensionAgnostic(true, 1000);
+  flexibleCanvas(1000);// Makes your project Dimension Agnostic
 }
 
 function draw() {
