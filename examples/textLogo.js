@@ -2,7 +2,7 @@ let aspectRatio = 1 / 1;
 
 function setup() {
     createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
-    dimensionAgnostic(true, 1000); // canvas is 1000 units wide
+    flexibleCanvas(1000); // canvas is 1000 units wide
 }
 
 function draw() {
