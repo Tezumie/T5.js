@@ -207,8 +207,8 @@ class T5Canvas {
         }
     }
 
-    dimensionAgnostic(enabled, unit = 400) {
-        this.dimensionAgnosticMode = enabled;
+    dimensionAgnostic(unit = 400) {
+        this.dimensionAgnosticMode = true;
         this.dimensionUnit = unit;
         this._updateGlobalDimensions();
         this._updateBufferDimensions();
@@ -908,7 +908,7 @@ const frameRate = (value) => myT5.frameRate(value);
 // Aliases for global scope
 const drawingContext = myT5.canvas.getContext('2d');
 const createCanvas = (width, height) => myT5.createCanvas(width, height);
-const dimensionAgnostic = (enabled, unit) => myT5.dimensionAgnostic(enabled, unit);
+const flexibleCanvas = (unit) => myT5.dimensionAgnostic(unit);
 const disableContextMenu = () => myT5.disableContextMenu();
 const pixelDensity = (val) => myT5.pixelDensity(val);
 const saveCanvas = (filename, extension) => myT5.saveCanvas(filename, extension);
