@@ -24,7 +24,7 @@ Gets or sets the pixel density of the canvas.
 - **Arguments:**
   - `val` (number, optional): The pixel density value. If omitted, returns the current pixel density.
 
-### `dimensionAgnostic(enabled, unit = 400)`
+### `flexibleCanvas(unit = 400)`
 Sets the canvas to dimension-agnostic mode.
 - **Arguments:**
   - `enabled` (boolean): Enable or disable dimension-agnostic mode.
