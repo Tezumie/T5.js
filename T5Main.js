@@ -207,8 +207,8 @@ class T5Canvas {
         }
     }
 
-    dimensionAgnostic(enabled, unit = 400) {
-        this.dimensionAgnosticMode = enabled;
+    dimensionAgnostic(unit = 400) {
+        this.dimensionAgnosticMode = true;
         this.dimensionUnit = unit;
         this._updateGlobalDimensions();
         this._updateBufferDimensions();
@@ -908,7 +908,7 @@ const frameRate = (value) => myT5.frameRate(value);
 // Aliases for global scope
 const drawingContext = myT5.canvas.getContext('2d');
 const createCanvas = (width, height) => myT5.createCanvas(width, height);
-const dimensionAgnostic = (enabled, unit) => myT5.dimensionAgnostic(enabled, unit);
+const flexibleCanvas = (unit) => myT5.dimensionAgnostic(unit);
 const disableContextMenu = () => myT5.disableContextMenu();
 const pixelDensity = (val) => myT5.pixelDensity(val);
 const saveCanvas = (filename, extension) => myT5.saveCanvas(filename, extension);
@@ -1483,10 +1483,458 @@ class T5Vector {
         );
     }
 }
+//*************************************************************************//
+//********************************-T5Input-********************************//
+//*************************************************************************//
 
-// Aliases for global scope
-const createVector = (x, y, z) => new T5Vector(x, y, z);
+class T5Input {
+    constructor(baseT5) {
+        this.baseT5 = baseT5;
+        this.keyIsPressed = false;
+        this.key = '';
+        this.keyCode = 0;
+        this.mouseButton = '';
+        this.mouseIsPressed = false;
+        this.movedX = 0;
+        this.movedY = 0;
+        this._mouseX = 0;
+        this._mouseY = 0;
+        this._pmouseX = 0;
+        this._pmouseY = 0;
+        this._winMouseX = 0;
+        this._winMouseY = 0;
+        this._pwinMouseX = 0;
+        this._pwinMouseY = 0;
+        this._initEventListeners();
+    }
 
+    _initEventListeners() {
+        document.addEventListener('keydown', (e) => this._keyPressed(e));
+        document.addEventListener('keyup', (e) => this._keyReleased(e));
+        document.addEventListener('keypress', (e) => this._keyTyped(e));
+        document.addEventListener('mousemove', (e) => this._onmousemove(e));
+        document.addEventListener('mousedown', (e) => this._onmousedown(e));
+        document.addEventListener('mouseup', (e) => this._onmouseup(e));
+        document.addEventListener('click', (e) => this._onclick(e));
+        document.addEventListener('dblclick', (e) => this._doubleClicked(e));
+        document.addEventListener('wheel', (e) => this._mouseWheel(e));
+    }
+
+    _keyPressed(e) {
+        this.keyIsPressed = true;
+        this.key = e.key;
+        this.keyCode = e.keyCode;
+        if (typeof window.keyPressed === 'function') {
+            window.keyPressed(e);
+        }
+    }
+
+    _keyReleased(e) {
+        this.keyIsPressed = false;
+        this.key = '';
+        if (typeof window.keyReleased === 'function') {
+            window.keyReleased(e);
+        }
+        this.keyCode = 0;
+    }
+
+    _keyTyped(e) {
+        if (typeof window.keyTyped === 'function') {
+            window.keyTyped(e);
+        }
+    }
+
+    _onmousemove(e) {
+        this._updateMouse(e);
+        if (this.mouseIsPressed) {
+            if (typeof window.mouseDragged === 'function') {
+                window.mouseDragged(e);
+            }
+        } else {
+            if (typeof window.mouseMoved === 'function') {
+                window.mouseMoved(e);
+            }
+        }
+    }
+
+    _onmousedown(e) {
+        this._updateMouse(e);
+        this.mouseIsPressed = true;
+        this.mouseButton = ['left', 'middle', 'right'][e.button];
+        if (typeof window.mousePressed === 'function') {
+            window.mousePressed(e);
+        }
+    }
+
+    _onmouseup(e) {
+        this._updateMouse(e);
+        this.mouseIsPressed = false;
+        if (typeof window.mouseReleased === 'function') {
+            window.mouseReleased(e);
+        }
+    }
+
+    _onclick(e) {
+        this._updateMouse(e);
+        this.mouseIsPressed = true;
+        if (typeof window.mouseClicked === 'function') {
+            window.mouseClicked(e);
+        }
+        this.mouseIsPressed = false;
+    }
+
+    _doubleClicked(e) {
+        if (typeof window.doubleClicked === 'function') {
+            window.doubleClicked(e);
+        }
+    }
+
+    _mouseWheel(e) {
+        if (typeof window.mouseWheel === 'function') {
+            window.mouseWheel(e);
+        }
+    }
+
+    _updateMouse(e) {
+        if (e.changedTouches) return;
+        const rect = this.baseT5.canvas.getBoundingClientRect();
+        const canvasWidth = this.baseT5.canvas.width / this.baseT5.pixelDensityValue;
+        const canvasHeight = this.baseT5.canvas.height / this.baseT5.pixelDensityValue;
+
+        let displayedWidth, displayedHeight;
+        const aspectRatioCanvas = canvasWidth / canvasHeight;
+        const aspectRatioRect = rect.width / rect.height;
+
+        if (aspectRatioCanvas > aspectRatioRect) {
+            displayedWidth = rect.width;
+            displayedHeight = rect.width / aspectRatioCanvas;
+        } else {
+            displayedWidth = rect.height * aspectRatioCanvas;
+            displayedHeight = rect.height;
+        }
+
+        const offsetX = (rect.width - displayedWidth) / 2;
+        const offsetY = (rect.height - displayedHeight) / 2;
+
+        const sx = canvasWidth / displayedWidth;
+        const sy = canvasHeight / displayedHeight;
+
+        this._pmouseX = this._mouseX;
+        this._pmouseY = this._mouseY;
+        this._mouseX = (e.clientX - rect.left - offsetX) * sx;
+        this._mouseY = (e.clientY - rect.top - offsetY) * sy;
+
+        this._pwinMouseX = this._winMouseX;
+        this._pwinMouseY = this._winMouseY;
+        this._winMouseX = e.clientX;
+        this._winMouseY = e.clientY;
+    }
+
+    keyIsDown(keyCode) {
+        return this.keyIsPressed && this.keyCode === keyCode;
+    }
+
+    requestPointerLock() {
+        if (this.baseT5.canvas) {
+            this.baseT5.canvas.requestPointerLock();
+        }
+    }
+
+    exitPointerLock() {
+        document.exitPointerLock();
+    }
+
+    cursor(type = 'default', x = 0, y = 0) {
+        const canvas = this.baseT5.canvas;
+        const types = {
+            ARROW: 'default',
+            CROSS: 'crosshair',
+            HAND: 'pointer',
+            MOVE: 'move',
+            TEXT: 'text',
+            WAIT: 'wait'
+        };
+
+        if (types[type]) {
+            canvas.style.cursor = types[type];
+        } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
+            canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
+        } else {
+            canvas.style.cursor = type;
+        }
+    }
+
+    noCursor() {
+        const canvas = this.baseT5.canvas;
+        canvas.style.cursor = 'none';
+    }
+
+    get mouseX() {
+        return this._scaleCoordinate(this._mouseX);
+    }
+
+    get mouseY() {
+        return this._scaleCoordinate(this._mouseY);
+    }
+
+    get pmouseX() {
+        return this._scaleCoordinate(this._pmouseX);
+    }
+
+    get pmouseY() {
+        return this._scaleCoordinate(this._pmouseY);
+    }
+
+    get winMouseX() {
+        return this._scaleCoordinate(this._winMouseX);
+    }
+
+    get winMouseY() {
+        return this._scaleCoordinate(this._winMouseY);
+    }
+
+    get pwinMouseX() {
+        return this._scaleCoordinate(this._pwinMouseX);
+    }
+
+    get pwinMouseY() {
+        return this._scaleCoordinate(this._pwinMouseY);
+    }
+
+    _scaleCoordinate(coord) {
+        if (this.baseT5.dimensionAgnosticMode) {
+            return (coord / this.baseT5.canvas.width * this.baseT5.pixelDensityValue) * this.baseT5.dimensionUnit;
+        }
+        return coord;
+    }
+}
+
+const myT5Input = new T5Input(myT5);
+
+const properties = [
+    'mouseX', 'mouseY', 'pmouseX', 'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
+    'mouseButton', 'mouseIsPressed'
+];
+
+properties.forEach(prop => {
+    Object.defineProperty(window, prop, {
+        get: function () {
+            return myT5Input[prop];
+        }
+    });
+});
+
+// Alias input functions for global scope
+const keyIsPressed = () => myT5Input.keyIsPressed;
+const key = () => myT5Input.key;
+Object.defineProperty(window, 'keyCode', {
+    get: function () {
+        return myT5Input.keyCode;
+    }
+});
+const keyIsDown = (code) => myT5Input.keyIsDown(code);
+const movedX = () => myT5Input.movedX;
+const movedY = () => myT5Input.movedY;
+const requestPointerLock = () => myT5Input.requestPointerLock();
+const exitPointerLock = () => myT5Input.exitPointerLock();
+const cursor = (type, x, y) => myT5Input.cursor(type, x, y);
+const noCursor = () => myT5Input.noCursor();
+
+//************************************************************************//
+//********************************-T5Text-********************************//
+//************************************************************************//
+
+class T5Text {
+    constructor(baseT5) {
+        this.baseT5 = baseT5;
+        this.baseT5.textSize = 16;
+        this.baseT5.textFont = 'Arial, sans-serif'; // Arial for better emoji support
+        this.baseT5.textAlign = 'left';
+        this.baseT5.textBaseline = 'alphabetic';
+        this.baseT5.textLeading = 1.2;
+        this.baseT5.textStyle = 'normal';
+        this.baseT5.textWrap = 'word';
+        this.baseT5.letterSpacing = 0;
+    }
+
+    textSize(size) {
+        this.baseT5.textSize = size;
+    }
+
+    textFont(font) {
+        this.baseT5.textFont = font;
+    }
+
+    textAlign(horizAlign, vertAlign = 'alphabetic') {
+        this.baseT5.textAlign = horizAlign;
+        this.baseT5.textBaseline = vertAlign;
+    }
+
+    textLeading(leading) {
+        this.baseT5.textLeading = leading;
+    }
+
+    textStyle(style) {
+        this.baseT5.textStyle = style;
+    }
+
+    textWrap(wrap) {
+        this.baseT5.textWrap = wrap;
+    }
+
+    letterSpacing(spacing) {
+        this.baseT5.letterSpacing = spacing;
+    }
+
+    textWidth(text) {
+        const ctx = this.baseT5.context
+        if (ctx) {
+            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
+            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
+            let width = 0;
+            for (let i = 0; i < text.length; i++) {
+                width += ctx.measureText(text[i]).width + spacing;
+            }
+            return width - spacing;
+        }
+        return 0;
+    }
+
+    textAscent() {
+        const ctx = this.baseT5.context
+        if (ctx) {
+            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
+            return ctx.measureText('M').actualBoundingBoxAscent;
+        }
+        return 0;
+    }
+
+    textDescent() {
+        const ctx = this.baseT5.context
+        if (ctx) {
+            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
+            return ctx.measureText('g').actualBoundingBoxDescent;
+        }
+        return 0;
+    }
+
+    loadFont(path, callback) {
+        const font = new FontFace('customFont', `url(${path})`);
+        font.load().then((loadedFont) => {
+            document.fonts.add(loadedFont);
+            if (callback) callback(loadedFont);
+        }).catch((error) => {
+            console.error('Error loading font:', error);
+            if (callback) callback(null);
+        });
+    }
+
+    text(text, x, y) {
+        const ctx = this.baseT5.context
+        if (ctx) {
+            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
+            ctx.textAlign = this.baseT5.textAlign;
+            ctx.textBaseline = this.baseT5.textBaseline;
+            ctx.fillStyle = this.baseT5.fillStyle;
+            ctx.strokeStyle = this.baseT5.strokeStyle;
+
+            const scaledX = this.baseT5._scaleCoordinate(x);
+            const scaledY = this.baseT5._scaleCoordinate(y);
+
+            if (this.baseT5.fillStyle) {
+                ctx.fillText(text, scaledX, scaledY);
+            }
+            if (this.baseT5.strokeStyle) {
+                ctx.lineWidth = this.baseT5.strokeWidth;
+                ctx.strokeText(text, scaledX, scaledY);
+            }
+        }
+    }
+
+    multilineText(text, x, y, maxWidth) {
+        const ctx = this.baseT5.context
+        if (ctx) {
+            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
+            ctx.textAlign = this.baseT5.textAlign;
+            ctx.textBaseline = this.baseT5.textBaseline;
+            ctx.fillStyle = this.baseT5.fillStyle;
+            ctx.strokeStyle = this.baseT5.strokeStyle;
+            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
+
+            const lines = this._wrapText(ctx, text, this.baseT5._scaleCoordinate(maxWidth));
+            let lineHeight = this.baseT5._scaleCoordinate(this.baseT5.textSize) * this.baseT5.textLeading;
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                let currentY = y + i * lineHeight;
+                let currentX = this.baseT5._scaleCoordinate(x);
+                for (let j = 0; j < line.length; j++) {
+                    if (this.baseT5.fillStyle) {
+                        ctx.fillText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
+                    }
+                    if (this.baseT5.strokeStyle) {
+                        ctx.lineWidth = this.baseT5.strokeWidth;
+                        ctx.strokeText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
+                    }
+                    currentX += ctx.measureText(line[j]).width + spacing;
+                }
+            }
+        }
+    }
+
+    _wrapText(ctx, text, maxWidth) {
+        const words = text.split(' ');
+        const lines = [];
+        let currentLine = words[0];
+
+        for (let i = 1; i < words.length; i++) {
+            const word = words[i];
+            const width = ctx.measureText(currentLine + ' ' + word).width;
+            if (width < maxWidth) {
+                currentLine += ' ' + word;
+            } else {
+                lines.push(currentLine);
+                currentLine = word;
+            }
+        }
+        lines.push(currentLine);
+        return lines;
+    }
+}
+
+//T5Text instance link to T5 instance
+const myT5Text = new T5Text(myT5);
+
+// Alias text functions for global scope
+const textSize = (size) => myT5Text.textSize(size);
+const textFont = (font) => myT5Text.textFont(font);
+const textAlign = (horizAlign, vertAlign) => myT5Text.textAlign(horizAlign, vertAlign);
+const text = (content, x, y) => myT5Text.text(content, x, y);
+const textWidth = (content) => myT5Text.textWidth(content);
+const textLeading = (leading) => myT5Text.textLeading(leading);
+const textLineHeight = (height) => myT5Text.textLineHeight(height);
+const textStyle = (style) => myT5Text.textStyle(style);
+const textAscent = () => myT5Text.textAscent();
+const textDescent = () => myT5Text.textDescent();
+const textWrap = (wrap) => myT5Text.textWrap(wrap);
+const letterSpacing = (spacing) => myT5Text.letterSpacing(spacing);
+const loadFont = (path, callback) => myT5Text.loadFont(path, callback);
+const multilineText = (content, x, y, maxWidth) => myT5Text.multilineText(content, x, y, maxWidth);
+
+// Horizontal alignment (textAlign):
+//     'left' (default)
+//     'right'
+//     'center'
+//     'start'
+//     'end'
+
+// Vertical alignment (textBaseline):
+//     'top'
+//     'hanging'
+//     'middle'
+//     'alphabetic' (default)
+//     'ideographic'
+//     'bottom'
 //***********************************************************************//
 //********************************-T5Dom-********************************//
 //***********************************************************************//
@@ -1854,460 +2302,6 @@ const createAudio = (src) => myT5Dom.createAudio(src);
 const createCapture = () => myT5Dom.createCapture();
 const createElement = (tag, html) => myT5Dom.createElement(tag, html);
 
-
-//*************************************************************************//
-//********************************-T5Input-********************************//
-//*************************************************************************//
-
-class T5Input {
-    constructor(baseT5) {
-        this.baseT5 = baseT5;
-        this.keyIsPressed = false;
-        this.key = '';
-        this.keyCode = 0;
-        this.mouseButton = '';
-        this.mouseIsPressed = false;
-        this.movedX = 0;
-        this.movedY = 0;
-        this._mouseX = 0;
-        this._mouseY = 0;
-        this._pmouseX = 0;
-        this._pmouseY = 0;
-        this._winMouseX = 0;
-        this._winMouseY = 0;
-        this._pwinMouseX = 0;
-        this._pwinMouseY = 0;
-        this._initEventListeners();
-    }
-
-    _initEventListeners() {
-        document.addEventListener('keydown', (e) => this._keyPressed(e));
-        document.addEventListener('keyup', (e) => this._keyReleased(e));
-        document.addEventListener('keypress', (e) => this._keyTyped(e));
-        document.addEventListener('mousemove', (e) => this._onmousemove(e));
-        document.addEventListener('mousedown', (e) => this._onmousedown(e));
-        document.addEventListener('mouseup', (e) => this._onmouseup(e));
-        document.addEventListener('click', (e) => this._onclick(e));
-        document.addEventListener('dblclick', (e) => this._doubleClicked(e));
-        document.addEventListener('wheel', (e) => this._mouseWheel(e));
-    }
-
-    _keyPressed(e) {
-        this.keyIsPressed = true;
-        this.key = e.key;
-        this.keyCode = e.keyCode;
-        if (typeof window.keyPressed === 'function') {
-            window.keyPressed(e);
-        }
-    }
-
-    _keyReleased(e) {
-        this.keyIsPressed = false;
-        this.key = '';
-        if (typeof window.keyReleased === 'function') {
-            window.keyReleased(e);
-        }
-        this.keyCode = 0;
-    }
-
-    _keyTyped(e) {
-        if (typeof window.keyTyped === 'function') {
-            window.keyTyped(e);
-        }
-    }
-
-    _onmousemove(e) {
-        this._updateMouse(e);
-        if (this.mouseIsPressed) {
-            if (typeof window.mouseDragged === 'function') {
-                window.mouseDragged(e);
-            }
-        } else {
-            if (typeof window.mouseMoved === 'function') {
-                window.mouseMoved(e);
-            }
-        }
-    }
-
-    _onmousedown(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = true;
-        this.mouseButton = ['left', 'middle', 'right'][e.button];
-        if (typeof window.mousePressed === 'function') {
-            window.mousePressed(e);
-        }
-    }
-
-    _onmouseup(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = false;
-        if (typeof window.mouseReleased === 'function') {
-            window.mouseReleased(e);
-        }
-    }
-
-    _onclick(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = true;
-        if (typeof window.mouseClicked === 'function') {
-            window.mouseClicked(e);
-        }
-        this.mouseIsPressed = false;
-    }
-
-    _doubleClicked(e) {
-        if (typeof window.doubleClicked === 'function') {
-            window.doubleClicked(e);
-        }
-    }
-
-    _mouseWheel(e) {
-        if (typeof window.mouseWheel === 'function') {
-            window.mouseWheel(e);
-        }
-    }
-
-    _updateMouse(e) {
-        if (e.changedTouches) return;
-        const rect = this.baseT5.canvas.getBoundingClientRect();
-        const canvasWidth = this.baseT5.canvas.width / this.baseT5.pixelDensityValue;
-        const canvasHeight = this.baseT5.canvas.height / this.baseT5.pixelDensityValue;
-
-        let displayedWidth, displayedHeight;
-        const aspectRatioCanvas = canvasWidth / canvasHeight;
-        const aspectRatioRect = rect.width / rect.height;
-
-        if (aspectRatioCanvas > aspectRatioRect) {
-            displayedWidth = rect.width;
-            displayedHeight = rect.width / aspectRatioCanvas;
-        } else {
-            displayedWidth = rect.height * aspectRatioCanvas;
-            displayedHeight = rect.height;
-        }
-
-        const offsetX = (rect.width - displayedWidth) / 2;
-        const offsetY = (rect.height - displayedHeight) / 2;
-
-        const sx = canvasWidth / displayedWidth;
-        const sy = canvasHeight / displayedHeight;
-
-        this._pmouseX = this._mouseX;
-        this._pmouseY = this._mouseY;
-        this._mouseX = (e.clientX - rect.left - offsetX) * sx;
-        this._mouseY = (e.clientY - rect.top - offsetY) * sy;
-
-        this._pwinMouseX = this._winMouseX;
-        this._pwinMouseY = this._winMouseY;
-        this._winMouseX = e.clientX;
-        this._winMouseY = e.clientY;
-    }
-
-    keyIsDown(keyCode) {
-        return this.keyIsPressed && this.keyCode === keyCode;
-    }
-
-    requestPointerLock() {
-        if (this.baseT5.canvas) {
-            this.baseT5.canvas.requestPointerLock();
-        }
-    }
-
-    exitPointerLock() {
-        document.exitPointerLock();
-    }
-
-    cursor(type = 'default', x = 0, y = 0) {
-        const canvas = this.baseT5.canvas;
-        const types = {
-            ARROW: 'default',
-            CROSS: 'crosshair',
-            HAND: 'pointer',
-            MOVE: 'move',
-            TEXT: 'text',
-            WAIT: 'wait'
-        };
-
-        if (types[type]) {
-            canvas.style.cursor = types[type];
-        } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
-            canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
-        } else {
-            canvas.style.cursor = type;
-        }
-    }
-
-    noCursor() {
-        const canvas = this.baseT5.canvas;
-        canvas.style.cursor = 'none';
-    }
-
-    get mouseX() {
-        return this._scaleCoordinate(this._mouseX);
-    }
-
-    get mouseY() {
-        return this._scaleCoordinate(this._mouseY);
-    }
-
-    get pmouseX() {
-        return this._scaleCoordinate(this._pmouseX);
-    }
-
-    get pmouseY() {
-        return this._scaleCoordinate(this._pmouseY);
-    }
-
-    get winMouseX() {
-        return this._scaleCoordinate(this._winMouseX);
-    }
-
-    get winMouseY() {
-        return this._scaleCoordinate(this._winMouseY);
-    }
-
-    get pwinMouseX() {
-        return this._scaleCoordinate(this._pwinMouseX);
-    }
-
-    get pwinMouseY() {
-        return this._scaleCoordinate(this._pwinMouseY);
-    }
-
-    _scaleCoordinate(coord) {
-        if (this.baseT5.dimensionAgnosticMode) {
-            return (coord / this.baseT5.canvas.width * this.baseT5.pixelDensityValue) * this.baseT5.dimensionUnit;
-        }
-        return coord;
-    }
-}
-
-const myT5Input = new T5Input(myT5);
-
-const properties = [
-    'mouseX', 'mouseY', 'pmouseX', 'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
-    'mouseButton', 'mouseIsPressed'
-];
-
-properties.forEach(prop => {
-    Object.defineProperty(window, prop, {
-        get: function () {
-            return myT5Input[prop];
-        }
-    });
-});
-
-// Alias input functions for global scope
-const keyIsPressed = () => myT5Input.keyIsPressed;
-const key = () => myT5Input.key;
-Object.defineProperty(window, 'keyCode', {
-    get: function () {
-        return myT5Input.keyCode;
-    }
-});
-const keyIsDown = (code) => myT5Input.keyIsDown(code);
-const movedX = () => myT5Input.movedX;
-const movedY = () => myT5Input.movedY;
-const requestPointerLock = () => myT5Input.requestPointerLock();
-const exitPointerLock = () => myT5Input.exitPointerLock();
-const cursor = (type, x, y) => myT5Input.cursor(type, x, y);
-const noCursor = () => myT5Input.noCursor();
-
-//************************************************************************//
-//********************************-T5Text-********************************//
-//************************************************************************//
-
-class T5Text {
-    constructor(baseT5) {
-        this.baseT5 = baseT5;
-        this.baseT5.textSize = 16;
-        this.baseT5.textFont = 'Arial, sans-serif'; // Default font
-        this.baseT5.textAlign = 'left';
-        this.baseT5.textBaseline = 'alphabetic';
-        this.baseT5.textLeading = 1.2;
-        this.baseT5.textStyle = 'normal';
-        this.baseT5.textWrap = 'word';
-        this.baseT5.letterSpacing = 0;
-    }
-
-    textSize(size) {
-        this.baseT5.textSize = size;
-    }
-
-    textFont(font) {
-        this.baseT5.textFont = font;
-    }
-
-    textAlign(horizAlign, vertAlign = 'alphabetic') {
-        this.baseT5.textAlign = horizAlign;
-        this.baseT5.textBaseline = vertAlign;
-    }
-
-    textLeading(leading) {
-        this.baseT5.textLeading = leading;
-    }
-
-    textStyle(style) {
-        this.baseT5.textStyle = style;
-    }
-
-    textWrap(wrap) {
-        this.baseT5.textWrap = wrap;
-    }
-
-    letterSpacing(spacing) {
-        this.baseT5.letterSpacing = spacing;
-    }
-
-    textWidth(text) {
-        const ctx = this.baseT5.context;
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
-            let width = 0;
-            for (let i = 0; i < text.length; i++) {
-                width += ctx.measureText(text[i]).width + spacing;
-            }
-            return width - spacing;
-        }
-        return 0;
-    }
-
-    textAscent() {
-        const ctx = this.baseT5.context;
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            return ctx.measureText('M').actualBoundingBoxAscent;
-        }
-        return 0;
-    }
-
-    textDescent() {
-        const ctx = this.baseT5.context;
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            return ctx.measureText('g').actualBoundingBoxDescent;
-        }
-        return 0;
-    }
-
-    loadFont(path, callback) {
-        const font = new FontFace('customFont', `url(${path})`);
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            if (callback) callback(loadedFont);
-        }).catch((error) => {
-            console.error('Error loading font:', error);
-            if (callback) callback(null);
-        });
-    }
-
-    text(text, x, y) {
-        const ctx = this.baseT5.context;
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            ctx.textAlign = this.baseT5.textAlign;
-            ctx.textBaseline = this.baseT5.textBaseline;
-            ctx.fillStyle = this.baseT5.fillStyle;
-            ctx.strokeStyle = this.baseT5.strokeStyle;
-
-            const scaledX = this.baseT5._scaleCoordinate(x);
-            const scaledY = this.baseT5._scaleCoordinate(y);
-
-            if (this.baseT5.fillStyle) {
-                ctx.fillText(text, scaledX, scaledY);
-            }
-            if (this.baseT5.strokeStyle) {
-                ctx.lineWidth = this.baseT5.strokeWidth;
-                ctx.strokeText(text, scaledX, scaledY);
-            }
-        }
-    }
-
-    multilineText(text, x, y, maxWidth) {
-        const ctx = this.baseT5.context;
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            ctx.textAlign = this.baseT5.textAlign;
-            ctx.textBaseline = this.baseT5.textBaseline;
-            ctx.fillStyle = this.baseT5.fillStyle;
-            ctx.strokeStyle = this.baseT5.strokeStyle;
-            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
-
-            const lines = this._wrapText(ctx, text, this.baseT5._scaleCoordinate(maxWidth));
-            let lineHeight = this.baseT5._scaleCoordinate(this.baseT5.textSize) * this.baseT5.textLeading;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                let currentY = y + i * lineHeight;
-                let currentX = this.baseT5._scaleCoordinate(x);
-                for (let j = 0; j < line.length; j++) {
-                    if (this.baseT5.fillStyle) {
-                        ctx.fillText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
-                    }
-                    if (this.baseT5.strokeStyle) {
-                        ctx.lineWidth = this.baseT5.strokeWidth;
-                        ctx.strokeText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
-                    }
-                    currentX += ctx.measureText(line[j]).width + spacing;
-                }
-            }
-        }
-    }
-
-    _wrapText(ctx, text, maxWidth) {
-        const words = text.split(' ');
-        const lines = [];
-        let currentLine = words[0];
-
-        for (let i = 1; i < words.length; i++) {
-            const word = words[i];
-            const width = ctx.measureText(currentLine + ' ' + word).width;
-            if (width < maxWidth) {
-                currentLine += ' ' + word;
-            } else {
-                lines.push(currentLine);
-                currentLine = word;
-            }
-        }
-        lines.push(currentLine);
-        return lines;
-    }
-}
-
-// T5Text instance link to T5 instance
-const myT5Text = new T5Text(myT5);
-
-// Alias text functions for global scope
-const textSize = (size) => myT5Text.textSize(size);
-const textFont = (font) => myT5Text.textFont(font);
-const textAlign = (horizAlign, vertAlign) => myT5Text.textAlign(horizAlign, vertAlign);
-const text = (content, x, y) => myT5Text.text(content, x, y);
-const textWidth = (content) => myT5Text.textWidth(content);
-const textLeading = (leading) => myT5Text.textLeading(leading);
-const textLineHeight = (height) => myT5Text.textLineHeight(height);
-const textStyle = (style) => myT5Text.textStyle(style);
-const textAscent = () => myT5Text.textAscent();
-const textDescent = () => myT5Text.textDescent();
-const textWrap = (wrap) => myT5Text.textWrap(wrap);
-const letterSpacing = (spacing) => myT5Text.letterSpacing(spacing);
-const loadFont = (path, callback) => myT5Text.loadFont(path, callback);
-const multilineText = (content, x, y, maxWidth) => myT5Text.multilineText(content, x, y, maxWidth);
-
-// Horizontal alignment (textAlign):
-//     'left' (default)
-//     'right'
-//     'center'
-//     'start'
-//     'end'
-
-// Vertical alignment (textBaseline):
-//     'top'
-//     'hanging'
-//     'middle'
-//     'alphabetic' (default)
-//     'ideographic'
-//     'bottom'
-
 //************************************************************************//
 //********************************-T5Draw-********************************//
 //************************************************************************//
@@ -2525,8 +2519,3 @@ const radialStroke = (color1, color2, x, y, radius) => myT5Draw.radialStroke(col
 const dynamicGradient = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicGradient(type, colorStops, x1, y1, x2, y2, r1, r2);
 const dynamicFill = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicFill(type, colorStops, x1, y1, x2, y2, r1, r2);
 const dynamicStroke = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicStroke(type, colorStops, x1, y1, x2, y2, r1, r2);
-
-//********************************-T5Webgl-********************************//
-//********************************-T5Shaders-********************************//
-//********************************-T5Physics-********************************//
-//********************************-T5Sound-********************************//
