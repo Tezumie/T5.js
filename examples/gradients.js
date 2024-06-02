@@ -2,7 +2,7 @@ let aspectRatio = 5 / 1;
 
 function setup() {
     createCanvas(windowWidth, windowWidth / aspectRatio);
-    dimensionAgnostic(true, 1000)
+    flexibleCanvas(1000)
     background(255, 255, 255)
 }
 
