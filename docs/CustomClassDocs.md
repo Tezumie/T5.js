@@ -14,7 +14,7 @@ class MyClassName {
         this.t5 = t5Instance;
     }
 
-    // Example method: Custom drawing function with scaling for dimension agnostic and pixel density
+    // Example method: Custom drawing function with scaling for flexibleCanvas and pixel density
     customDrawFunction(x, y, size) {
         const scaledX = this.t5._scaleCoordinate(x);
         const scaledY = this.t5._scaleCoordinate(y);
