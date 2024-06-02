@@ -73,7 +73,7 @@ function draw() {
 
 T5.js handles some funcitonalities different than p5, such as 2d textures with 'setTexture()', 'createBuffer()' instead of 'createGraphics()', 'borderRadius()' instead of curve vertex, and a few other changes. You can find examples of Most of the main differences being used in the examples folder.
 
-If you want 100% of the same p5.js functionalities, but highly optomized, use [Q5.js](https://github.com/quinton-ashley/q5.js) instead.
+If you want 100% of the same p5.js functionalities, but highly optimized, use [Q5.js](https://github.com/quinton-ashley/q5.js) instead.
 
 ### Extending T5.js
 
