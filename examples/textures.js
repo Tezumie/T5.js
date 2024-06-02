@@ -7,7 +7,7 @@ function preload() {
 
 function setup() {
   createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
-  dimensionAgnostic(true, 800);
+  flexibleCanvas(800);
   background('#000000');
 
   // Make custom Textures
