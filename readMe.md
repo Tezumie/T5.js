@@ -6,7 +6,7 @@
 
 ## Overview
 
-T5.js is a lightweight and simplified 2D graphics library designed for drawing on the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead.
+T5.js is a lightweight and simplified 2D graphics library designed for drawing on the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity, along with some new functions. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead. 
 
 In addition to T5.js, I'm also a developer on [Q5.js](https://github.com/quinton-ashley/q5.js), a more fully-fledged library that brings some of the unique functionalities from T5.js, such as dimension-agnostic mode, and all of the 2d canvas functionalities of p5, into a more comprehensive package. Q5.js serves as a robust alternative for those looking for a lightweight yet powerful replacement for p5.js.
 
@@ -18,6 +18,7 @@ T5.js does not use any code from p5.js and is not affiliated with it. p5.js has 
 - Built-in dimension agnostic option
 - Optimized for performance
 - Modular design allowing for easy extension and customization
+  
 
 ## Getting Started
 
@@ -70,7 +71,9 @@ function draw() {
 ```
 ### Custom functions
 
-There are some handy custom functions built into T5.js, such as gradient fills and strokes, noisy lines and shapes, border radius settings, and more. There are some useful examples in the examples folder where you can see how some of them work.
+T5.js handles some funcitonalities different than p5, such as 2d textures with 'setTexture()', 'createBuffer()' instead of 'createGraphics()', 'borderRadius()' instead of curve vertex, and a few other changes. You can find examples of Most of the main differences being used in the examples folder.
+
+If you want 100% of the same p5.js functionalities, but highly optomized, use [Q5.js](https://github.com/quinton-ashley/q5.js) instead.
 
 ### Extending T5.js
 
