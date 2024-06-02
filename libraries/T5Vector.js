@@ -266,3 +266,6 @@ class T5Vector {
         );
     }
 }
+
+// Aliases for global scope
+const createVector = (x, y, z) => new T5Vector(x, y, z);
