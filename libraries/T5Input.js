@@ -109,41 +109,50 @@ class T5Input {
             window.mouseWheel(e);
         }
     }
+    _calculateCanvasMetrics() {
+        const { canvas } = this.baseT5;
+        const rect = canvas.getBoundingClientRect();
+        const aspectRatioCanvas = canvas.width / canvas.height;
+        const aspectRatioRect = rect.width / rect.height;
+
+        const isCanvasWider = aspectRatioCanvas > aspectRatioRect;
+        const displayedWidth = isCanvasWider ? rect.width : rect.height * aspectRatioCanvas;
+        const displayedHeight = isCanvasWider ? rect.width / aspectRatioCanvas : rect.height;
+
+        this.canvasMetrics = {
+            offsetX: (rect.width - displayedWidth) / 2,
+            offsetY: (rect.height - displayedHeight) / 2,
+            scaleX: canvas.width / displayedWidth,
+            scaleY: canvas.height / displayedHeight,
+            rect,
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+    }
 
     _updateMouse(e) {
         if (e.changedTouches) return;
-        const rect = this.baseT5.canvas.getBoundingClientRect();
-        const canvasWidth = this.baseT5.canvas.width / this.baseT5.pixelDensityValue;
-        const canvasHeight = this.baseT5.canvas.height / this.baseT5.pixelDensityValue;
 
-        let displayedWidth, displayedHeight;
-        const aspectRatioCanvas = canvasWidth / canvasHeight;
-        const aspectRatioRect = rect.width / rect.height;
-
-        if (aspectRatioCanvas > aspectRatioRect) {
-            displayedWidth = rect.width;
-            displayedHeight = rect.width / aspectRatioCanvas;
-        } else {
-            displayedWidth = rect.height * aspectRatioCanvas;
-            displayedHeight = rect.height;
+        const { canvasMetrics } = this;
+        if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
+            this._calculateCanvasMetrics();
         }
 
-        const offsetX = (rect.width - displayedWidth) / 2;
-        const offsetY = (rect.height - displayedHeight) / 2;
-
-        const sx = canvasWidth / displayedWidth;
-        const sy = canvasHeight / displayedHeight;
+        const { offsetX, offsetY, scaleX, scaleY, rect } = this.canvasMetrics;
+        const scrollX = window.scrollX || window.pageXOffset;
+        const scrollY = window.scrollY || window.pageYOffset;
 
         this._pmouseX = this._mouseX;
         this._pmouseY = this._mouseY;
-        this._mouseX = (e.clientX - rect.left - offsetX) * sx;
-        this._mouseY = (e.clientY - rect.top - offsetY) * sy;
-
+        this._mouseX = (e.clientX - rect.left - offsetX + scrollX) * scaleX;
+        this._mouseY = (e.clientY - rect.top - offsetY + scrollY) * scaleY;
         this._pwinMouseX = this._winMouseX;
         this._pwinMouseY = this._winMouseY;
-        this._winMouseX = e.clientX;
-        this._winMouseY = e.clientY;
+        this._winMouseX = e.clientX + scrollX;
+        this._winMouseY = e.clientY + scrollY;
     }
+
+
 
     keyIsDown(keyCode) {
         return this.keyIsPressed && this.keyCode === keyCode;
