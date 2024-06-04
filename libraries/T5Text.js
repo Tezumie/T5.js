@@ -179,6 +179,25 @@ const letterSpacing = (spacing) => myT5Text.letterSpacing(spacing);
 const loadFont = (path, callback) => myT5Text.loadFont(path, callback);
 const multilineText = (content, x, y, maxWidth) => myT5Text.multilineText(content, x, y, maxWidth);
 
+// Font styles
+const NORMAL = 'normal';
+const ITALIC = 'italic';
+const BOLD = 'bold';
+const BOLDITALIC = 'italic bold';
+const LIGHT = 'light';
+const UNDERLINE = 'underline';
+const STRIKETHROUGH = 'line-through';
+// Text alignment
+const CENTER = 'center';
+const LEFT = 'left';
+const RIGHT = 'right';
+const TOP = 'top';
+const BOTTOM = 'bottom';
+const BASELINE = 'alphabetic';
+const MIDDLE = 'middle';
+const HANGING = 'hanging';
+const IDEOGRAPHIC = 'ideographic';
+
 // Horizontal alignment (textAlign):
 //     'left' (default)
 //     'right'
