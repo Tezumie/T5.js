@@ -1752,6 +1752,54 @@ const exitPointerLock = () => myT5Input.exitPointerLock();
 const cursor = (type, x, y) => myT5Input.cursor(type, x, y);
 const noCursor = () => myT5Input.noCursor();
 
+// Key codes
+const ALT = 18;
+const BACKSPACE = 8;
+const CONTROL = 17;
+const DELETE = 46;
+const DOWN_ARROW = 40;
+const ENTER = 13;
+const ESCAPE = 27;
+const LEFT_ARROW = 37;
+const OPTION = 18;
+const RETURN = 13;
+const RIGHT_ARROW = 39;
+const SHIFT = 16;
+const TAB = 9;
+const UP_ARROW = 38;
+// Navigation keys
+const HOME = 36;
+const END = 35;
+const PAGE_UP = 33;
+const PAGE_DOWN = 34;
+// Modifier keys
+const CAPS_LOCK = 20;
+const NUM_LOCK = 144;
+// Special characters
+const SPACE = 32;
+const INSERT = 45;
+const PRINT_SCREEN = 44;
+// Cursor types
+const ARROW = 'default';
+const CROSS = 'crosshair';
+const HAND = 'pointer';
+const MOVE = 'move';
+const TEXT = 'text';
+const WAIT = 'wait';
+const HELP = 'help';
+const NOT_ALLOWED = 'not-allowed';
+const ZOOM_IN = 'zoom-in';
+const ZOOM_OUT = 'zoom-out';
+const GRAB = 'grab';
+const GRABBING = 'grabbing';
+const RESIZE_NW = 'nw-resize';
+const RESIZE_NE = 'ne-resize';
+const RESIZE_SW = 'sw-resize';
+const RESIZE_SE = 'se-resize';
+const RESIZE_E = 'e-resize';
+const RESIZE_W = 'w-resize';
+const RESIZE_N = 'n-resize';
+const RESIZE_S = 's-resize';
 //************************************************************************//
 //********************************-T5Text-********************************//
 //************************************************************************//
@@ -1932,6 +1980,25 @@ const textWrap = (wrap) => myT5Text.textWrap(wrap);
 const letterSpacing = (spacing) => myT5Text.letterSpacing(spacing);
 const loadFont = (path, callback) => myT5Text.loadFont(path, callback);
 const multilineText = (content, x, y, maxWidth) => myT5Text.multilineText(content, x, y, maxWidth);
+
+// Font styles
+const NORMAL = 'normal';
+const ITALIC = 'italic';
+const BOLD = 'bold';
+const BOLDITALIC = 'italic bold';
+const LIGHT = 'light';
+const UNDERLINE = 'underline';
+const STRIKETHROUGH = 'line-through';
+// Text alignment
+const CENTER = 'center';
+const LEFT = 'left';
+const RIGHT = 'right';
+const TOP = 'top';
+const BOTTOM = 'bottom';
+const BASELINE = 'alphabetic';
+const MIDDLE = 'middle';
+const HANGING = 'hanging';
+const IDEOGRAPHIC = 'ideographic';
 
 // Horizontal alignment (textAlign):
 //     'left' (default)
