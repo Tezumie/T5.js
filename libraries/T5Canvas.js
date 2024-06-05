@@ -155,6 +155,7 @@ class T5Canvas {
         this.eraseStrokeStrength = 255;
         this.resizeCallbacks = [];
         this.initialized = false;
+        this.smooth = true
         window.addEventListener('load', () => this._start());
         window.addEventListener('resize', () => this._handleResize());
     }
@@ -166,6 +167,9 @@ class T5Canvas {
         this._setCanvasSize(w, h);
         document.body.appendChild(this.canvas);
         this.context = this.canvas.getContext('2d');
+        if (!this.smooth) {
+            this.context.imageSmoothingEnabled = false;
+        }
         this._updateGlobalDimensions();
         registerWindowResized(() => windowResized());
         return this.canvas;
@@ -232,6 +236,9 @@ class T5Canvas {
         buffer.width = w
         buffer.height = h
         const context = buffer.getContext('2d');
+        if (!this.smooth) {
+            context.imageSmoothingEnabled = false;
+        }
         const id = this.randomGenerator.random().toString(36).substr(2, 9);
         this.offscreenBuffers[id] = { buffer, context, width: w, height: h };
         this._updateBufferDimensions();
@@ -261,7 +268,12 @@ class T5Canvas {
             this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         }
     }
-
+    smooth() {
+        this.smooth = true
+    }
+    noSmooth() {
+        this.smooth = false
+    }
     noLoop() {
         this.loopActive = false;
     }
@@ -595,7 +607,9 @@ class T5Canvas {
         patternCanvas.height = height;
 
         patternContext.clearRect(0, 0, width, height);
-
+        if (!this.smooth) {
+            patternContext.imageSmoothingEnabled = false;
+        }
         if (mode === 'cover') {
             patternContext.drawImage(image, 0, 0, width, height);
         } else if (mode === 'contain') {
@@ -905,6 +919,9 @@ myT5.strokeWidth = myT5._scaleCoordinate(myT5.strokeWidth);
 const registerWindowResized = (callback) => myT5.windowResized(callback);
 const resizeCanvas = (width, height) => myT5.resizeCanvas(width, height);
 const frameRate = (value) => myT5.frameRate(value);
+const smooth = () => myT5.smooth();
+const noSmooth = () => myT5.noSmooth();
+
 // Aliases for global scope
 const drawingContext = myT5.canvas.getContext('2d');
 const createCanvas = (width, height) => myT5.createCanvas(width, height);
