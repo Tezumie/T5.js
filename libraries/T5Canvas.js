@@ -285,7 +285,7 @@ class T5Canvas {
                 draw();
             }
         }
-
+        this.textureImage = null
         requestAnimationFrame(() => this._drawLoop());
     }
 
