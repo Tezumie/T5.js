@@ -115,6 +115,11 @@ Attribution is already included at the top of the library.
 
  ```
 
+### Support
+
+To support this project, please consider [becoming a patron](https://www.patreon.com/aijscodeeditor).
+
+
 
 
 
