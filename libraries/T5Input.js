@@ -5,6 +5,7 @@
 class T5Input {
     constructor(baseT5) {
         this.baseT5 = baseT5;
+        this.keysPressed = new Set();
         this.keyIsPressed = false;
         this.key = '';
         this.keyCode = 0;
@@ -36,6 +37,7 @@ class T5Input {
     }
 
     _keyPressed(e) {
+        this.keysPressed.add(e.keyCode);
         this.keyIsPressed = true;
         this.key = e.key;
         this.keyCode = e.keyCode;
@@ -45,12 +47,18 @@ class T5Input {
     }
 
     _keyReleased(e) {
-        this.keyIsPressed = false;
-        this.key = '';
+        this.keysPressed.delete(e.keyCode);
+        this.keyIsPressed = this.keysPressed.size > 0;
+        if (this.keysPressed.size > 0) {
+            const iterator = this.keysPressed.values();
+            this.key = String.fromCharCode(iterator.next().value);
+        } else {
+            this.key = '';
+            this.keyCode = 0;
+        }
         if (typeof window.keyReleased === 'function') {
             window.keyReleased(e);
         }
-        this.keyCode = 0;
     }
 
     _keyTyped(e) {
@@ -109,6 +117,7 @@ class T5Input {
             window.mouseWheel(e);
         }
     }
+
     _calculateCanvasMetrics() {
         const { canvas } = this.baseT5;
         const rect = canvas.getBoundingClientRect();
@@ -152,10 +161,8 @@ class T5Input {
         this._winMouseY = e.clientY + scrollY;
     }
 
-
-
     keyIsDown(keyCode) {
-        return this.keyIsPressed && this.keyCode === keyCode;
+        return this.keysPressed.has(keyCode);
     }
 
     requestPointerLock() {
@@ -263,6 +270,8 @@ const requestPointerLock = () => myT5Input.requestPointerLock();
 const exitPointerLock = () => myT5Input.exitPointerLock();
 const cursor = (type, x, y) => myT5Input.cursor(type, x, y);
 const noCursor = () => myT5Input.noCursor();
+
+
 
 // Key codes
 const ALT = 18;
