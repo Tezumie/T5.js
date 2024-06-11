@@ -105,6 +105,10 @@
                 theme: 'vs-dark'
             });
 
+            window.addEventListener('resize', () => {
+                editor.layout();
+            });
+            
             document.getElementById('bundleButton').addEventListener('click', async () => {
                 const fileList = parseFileList(editor.getValue());
                 const combinedContent = await bundleFiles(fileList);
