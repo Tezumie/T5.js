@@ -1,7 +1,3 @@
-<!-- This html file is a tool for automatically bundling T5.js libraries -->
-<!-- bundle.html creates a customized T5Main.js -->
-<!-- T5Main.js is the only file you need to use T5.js -->
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -61,7 +57,6 @@
 
         #editor {
             flex-grow: 1;
-            padding-top: 20px;
         }
 
         #copyButton,
@@ -105,9 +100,16 @@
                 theme: 'vs-dark'
             });
 
-            window.addEventListener('resize', () => {
+            const resizeEditor = () => {
+                const headerHeight = document.querySelector('header').offsetHeight;
+                const editorHeight = window.innerHeight - headerHeight;
+                document.getElementById('editor').style.height = editorHeight + 'px';
                 editor.layout();
-            });
+            };
+
+            window.addEventListener('resize', resizeEditor);
+            resizeEditor();
+
             
             document.getElementById('bundleButton').addEventListener('click', async () => {
                 const fileList = parseFileList(editor.getValue());
