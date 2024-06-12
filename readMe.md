@@ -28,7 +28,14 @@ The quickest way to start using T5.js is with the aijs.io browser-based code edi
 
 Follow [this link](https://aijs.io/editor?user=aijs&project=T5JS) to open the template in a browser-based code editor. Then, simply press the play button to see your sketch in action.
 
-You can also include T5.js in your own project by downloading the library and adding it to your HTML file:
+
+You can Use T5.js via cdn.
+
+```html
+    <script src="https://cdn.jsdelivr.net/gh/Tezumie/T5.js@latest/T5Main.js"></script>
+```
+
+For production it is recomended to download T5Main.js and use the actual file to ensure no future compatability issues.
 
 ```html
 <!DOCTYPE html>
