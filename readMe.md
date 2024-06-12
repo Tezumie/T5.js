@@ -35,7 +35,7 @@ You can Use T5.js via cdn.
     <script src="https://cdn.jsdelivr.net/gh/Tezumie/T5.js@latest/T5Main.js"></script>
 ```
 
-For production it is recomended to download T5Main.js and use the actual file to ensure no future compatability issues.
+For production it is recommended to download T5Main.js and use the actual file to ensure no future compatability issues.
 
 ```html
 <!DOCTYPE html>
