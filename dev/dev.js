@@ -1,13 +1,14 @@
 let aspectRatio = 3 / 4;
-
+let mysound;
+function preload() {
+  mysound = loadSound('dev/coin_pickup.wav')
+}
 function setup() {
   createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
-  // Scale all drawing operations automatically to any window size
-  //flexibleCanvas(1000); // Canvas is 1000 units wide and Dimension Agnostic
+  mysound.setVolume(0.1);
+  mysound.loop();
 }
 
 function draw() {
-  background(220);
-  //rect(0, 0, 500) // 500x500 units is half the width 
-  ellipse(mouseX,mouseY,200)
+//  mysound.stop();
 }
