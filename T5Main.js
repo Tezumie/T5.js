@@ -318,6 +318,7 @@ class T5Canvas {
     _initializeCanvas() {
         const checkReady = () => {
             if (this.assetsLoadedCount === this.assetsToLoad) {
+                strokeWeight(1);
                 if (typeof setup === 'function') setup();
                 this.initialized = true;
                 if (typeof draw === 'function') {
@@ -386,6 +387,7 @@ class T5Canvas {
     strokeWeight(weight) {
         if (weight <= 0) {
             this.strokeStyle = null;
+            this.strokeWidth = 0;
         } else {
             this.strokeWidth = this._scaleCoordinate(weight);
         }
