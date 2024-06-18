@@ -913,6 +913,78 @@ class T5Canvas {
             throw new Error('Invalid color format');
         }
     }
+    fillArea(x, y, ...colorArgs) {
+        x = Math.floor(this._scaleCoordinate(x));
+        y = Math.floor(this._scaleCoordinate(y));
+
+        const fillColor = this._processColorArgs(colorArgs);
+        const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+
+        const data = imageData.data;
+        const width = this.canvas.width;
+        const height = this.canvas.height;
+
+        const targetColor = this.getColorAt(x, y, data, width);
+        const fillRgb = this.colorToRgba(fillColor);
+
+        const stack = [[x, y]];
+        const visited = new Uint8Array(width * height);
+        const key = (x, y) => y * width + x;
+
+        while (stack.length > 0) {
+            const [currX, currY] = stack.pop();
+            let startX = currX;
+            let endX = currX;
+
+            while (startX >= 0 && this.colorsMatch(this.getColorAt(startX, currY, data, width), targetColor)) {
+                startX--;
+            }
+            startX++;
+
+            while (endX < width && this.colorsMatch(this.getColorAt(endX, currY, data, width), targetColor)) {
+                endX++;
+            }
+            endX--;
+
+            for (let i = startX; i <= endX; i++) {
+                if (!visited[key(i, currY)]) {
+                    this.setColorAt(i, currY, fillRgb, data, width);
+                    visited[key(i, currY)] = 1;
+
+                    if (currY + 1 < height && !visited[key(i, currY + 1)] && this.colorsMatch(this.getColorAt(i, currY + 1, data, width), targetColor)) {
+                        stack.push([i, currY + 1]);
+                    }
+                    if (currY - 1 >= 0 && !visited[key(i, currY - 1)] && this.colorsMatch(this.getColorAt(i, currY - 1, data, width), targetColor)) {
+                        stack.push([i, currY - 1]);
+                    }
+                }
+            }
+        }
+
+        this.context.putImageData(imageData, 0, 0);
+    }
+
+    getColorAt(x, y, data, width) {
+        const index = (y * width + x) * 4;
+        return [data[index], data[index + 1], data[index + 2], data[index + 3]];
+    }
+
+    setColorAt(x, y, color, data, width) {
+        const index = (y * width + x) * 4;
+        data[index] = color[0];
+        data[index + 1] = color[1];
+        data[index + 2] = color[2];
+        data[index + 3] = color[3];
+    }
+
+    colorsMatch(a, b) {
+        return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+    }
+
+    colorToRgba(color) {
+        const components = getColorComponents(color);
+        return [components.r, components.g, components.b, components.a];
+    }
 }
 function windowResized() { }
 // T5 instance
@@ -923,7 +995,7 @@ const resizeCanvas = (width, height) => myT5.resizeCanvas(width, height);
 const frameRate = (value) => myT5.frameRate(value);
 const smooth = () => myT5.smooth();
 const noSmooth = () => myT5.noSmooth();
-
+const fillArea = (x, y, color) => myT5.fillArea(x, y, color);
 // Aliases for global scope
 const drawingContext = myT5.canvas.getContext('2d');
 const createCanvas = (width, height) => myT5.createCanvas(width, height);
@@ -1223,11 +1295,11 @@ function hex3ToComponents(hex) {
 }
 
 function rgbaStringToComponents(rgba) {
-    const match = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+),?\s*([\d.]*)\)/);
+    const match = rgba.match(/rgba?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),?\s*([\d.]*)\)/);
     if (match) {
-        const r = parseInt(match[1]);
-        const g = parseInt(match[2]);
-        const b = parseInt(match[3]);
+        const r = Math.round(parseFloat(match[1]));
+        const g = Math.round(parseFloat(match[2]));
+        const b = Math.round(parseFloat(match[3]));
         const a = match[4] ? parseFloat(match[4]) * 255 : 255;
         return { r, g, b, a };
     }
