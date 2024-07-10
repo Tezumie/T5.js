@@ -82,6 +82,8 @@ T5.js handles some funcitonalities different than p5, such as 2d textures with `
 
 If you want 100% of the same p5.js functionalities, but highly optimized, use [Q5.js](https://github.com/quinton-ashley/q5.js) instead.
 
+There are also some T5.js specific functions such as `fillArea()`, `noiseEllipse()`,  `gradientFill()`, `gradientStroke()` and more! look in the examples folder to see how some of them work.
+
 ### Extending T5.js
 
 You can create your own classes and extend the functionality of T5.js.
