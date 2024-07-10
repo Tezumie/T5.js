@@ -18,6 +18,7 @@ T5.js does not use any code from p5.js and is not affiliated with it. p5.js has 
 - Built-in dimension agnostic option
 - Optimized for performance
 - Modular design allowing for easy extension and customization
+- custom functions
   
 
 ## Getting Started
