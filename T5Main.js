@@ -4,552 +4,1315 @@
  * https://creativecommons.org/licenses/by-nc/4.0/
  */
 
-//**********************************************************************//
-//********************************-PRNG-********************************//
-//**********************************************************************//
+window.t5PreloadCount = 0;
+window.t5PreloadDone = 0;
+window.windowWidth = window.innerWidth;
+window.windowHeight = window.innerHeight;
 
-class PRNG {
-    constructor(seed) {
-        this.seed = seed;
-        this.m = 0x80000000;
-        this.a = 1103515245;
-        this.c = 12345;
-        this.state = seed ? seed : Math.floor(Math.random() * (this.m - 1));
-    }
-
-    nextInt() {
-        this.state = (this.a * this.state + this.c) % this.m;
-        return this.state;
-    }
-
-    nextFloat() {
-        return this.nextInt() / (this.m - 1);
-    }
-
-    random(min, max) {
-        if (min === undefined) {
-            return this.nextFloat();
+function T5(scope = 'global', parent) {
+    let $ = this;
+    function setScope(scope) {
+        if (scope === 'auto') {
+            scope = (window.setup || window.draw) ? 'global' : 'local';
         }
-        if (Array.isArray(min)) {
-            return min[Math.floor(this.nextFloat() * min.length)];
+        $._isGlobal = (scope === 'global');
+        return $._isGlobal ? window : undefined;
+    }
+
+    const globalScope = setScope(scope);
+
+    const p = new Proxy($, {
+        set: (target, property, value) => {
+            target[property] = value;
+            if ($._isGlobal) globalScope[property] = value;
+            return true;
         }
-        if (typeof min === 'object') {
-            const keys = Object.keys(min);
-            return min[keys[Math.floor(this.nextFloat() * keys.length)]];
-        }
-        if (max === undefined) {
-            return this.nextFloat() * min;
-        }
-        return this.nextFloat() * (max - min) + min;
-    }
-}
+    });
 
-class Noise {
-    constructor(seed) {
-        this.grad3 = [
-            [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-            [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-            [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
-        ];
-        this.p = Array.from({ length: 256 }, () => Math.floor(Math.random() * 256));
-        if (seed !== undefined) {
-            const prng = new PRNG(seed);
-            this.p = Array.from({ length: 256 }, () => Math.floor(prng.nextFloat() * 256));
-        }
-        this.perm = Array.from({ length: 512 }, (_, i) => this.p[i & 255]);
-    }
+    $.frameCount = 0;
+    $.deltaTime = 16;
+    $._targetFrameRate = 60;
+    $._targetFrameDuration = 1000 / $._targetFrameRate;
+    $._lastFrameTime = 0;
+    $._isLooping = true;
+    $._shouldDrawOnce = false;
 
-    dot(g, x, y, z) {
-        return g[0] * x + g[1] * y + g[2] * z;
-    }
+    let millisStart = performance.now();
+    $.millis = () => performance.now() - millisStart;
 
-    mix(a, b, t) {
-        return (1 - t) * a + t * b;
-    }
-
-    fade(t) {
-        return t * t * t * (t * (t * 6 - 15) + 10);
-    }
-
-    noise(x, y, z) {
-        const X = Math.floor(x) & 255;
-        const Y = Math.floor(y) & 255;
-        const Z = Math.floor(z) & 255;
-
-        x -= Math.floor(x);
-        y -= Math.floor(y);
-        z -= Math.floor(z);
-
-        const u = this.fade(x);
-        const v = this.fade(y);
-        const w = this.fade(z);
-
-        const A = this.perm[X] + Y;
-        const AA = this.perm[A] + Z;
-        const AB = this.perm[A + 1] + Z;
-        const B = this.perm[X + 1] + Y;
-        const BA = this.perm[B] + Z;
-        const BB = this.perm[B + 1] + Z;
-
-        const grad3 = this.grad3;
-        const perm = this.perm;
-
-        const dot = this.dot.bind(this);
-        const mix = this.mix.bind(this);
-
-        const lerp1 = mix(dot(grad3[perm[AA] % 12], x, y, z), dot(grad3[perm[BA] % 12], x - 1, y, z), u);
-        const lerp2 = mix(dot(grad3[perm[AB] % 12], x, y - 1, z), dot(grad3[perm[BB] % 12], x - 1, y - 1, z), u);
-        const lerp3 = mix(dot(grad3[perm[AA + 1] % 12], x, y, z - 1), dot(grad3[perm[BA + 1] % 12], x - 1, y, z - 1), u);
-        const lerp4 = mix(dot(grad3[perm[AB + 1] % 12], x, y - 1, z - 1), dot(grad3[perm[BB + 1] % 12], x - 1, y - 1, z - 1), u);
-
-        const mix1 = mix(lerp1, lerp2, v);
-        const mix2 = mix(lerp3, lerp4, v);
-
-        return mix(mix1, mix2, w);
-    }
-}
-
-//**************************************************************************//
-//********************************-T5Canvas-********************************//
-//**************************************************************************//
-
-class T5Canvas {
-    constructor() {
-        // Initialize properties
-        window.windowWidth = window.innerWidth;
-        window.windowHeight = window.innerHeight;
-        this.canvas = document.createElement('canvas');
-        this.canvas.id = 't5Canvas';
-        this.context = null;
-        this.offscreenBuffers = {};
-        this.currentBuffer = null;
-        this.fillStyle = '#ffffff';
-        this.strokeStyle = '#000000';
-        this.strokeWidth = 1;
-        this.strokeType = 'solid';
-        this.borderRadii = [];
-        this.backgroundColor = '#ffffff';
-        this.noiseGenerator = new Noise();
-        this.randomGenerator = new PRNG();
-        this.backgroundSet = false;
-        this.currentShape = null;
-        this.textureImage = null;
-        this.textureMode = 'cover';
-        this.textureCache = {};
-        this.scaledTextureCache = {};
-        this.assetsLoaded = false;
-        this.assetsToLoad = 0;
-        this.assetsLoadedCount = 0;
-        this.matrixStack = [];
-        this.frameRateValue = 60;
-        window.frameCount = 0;
-        window.deltaTime = 0;
-        this.lastFrameTime = performance.now();
-        this.loopActive = true;
-        this.drawOnce = false;
-        this.pixelDensityValue = window.devicePixelRatio || 1;
-        this.dimensionAgnosticMode = false;
-        this.dimensionUnit = 400;
-        this.eraseMode = false;
-        this.eraseFillStrength = 255;
-        this.eraseStrokeStrength = 255;
-        this.resizeCallbacks = [];
-        this.initialized = false;
-        this.smooth = true
-        window.addEventListener('load', () => this._start());
-        window.addEventListener('resize', () => this._handleResize());
-    }
-
-    createCanvas(w, h) {
-        if (this.initialized) {
-            return;
-        }
-        this._setCanvasSize(w, h);
-        document.body.appendChild(this.canvas);
-        this.context = this.canvas.getContext('2d');
-        if (!this.smooth) {
-            this.context.imageSmoothingEnabled = false;
-        }
-        this._updateGlobalDimensions();
-        registerWindowResized(() => windowResized());
-        return this.canvas;
-    }
-
-    resizeCanvas(w, h) {
-        this._setCanvasSize(w, h);
-        this._updateGlobalDimensions();
-    }
-
-    _setCanvasSize(w, h) {
-        const d = this.pixelDensityValue;
-        this.canvas.width = w * d;
-        this.canvas.height = h * d;
-        this.canvas.style.width = `${w}px`;
-        this.canvas.style.height = `${h}px`;
-    }
-
-    pixelDensity(val) {
-        if (val === undefined) {
-            return this.pixelDensityValue;
+    $.frameRate = (rate) => {
+        if (rate !== undefined) {
+            $._targetFrameRate = rate;
+            $._targetFrameDuration = 1000 / $._targetFrameRate;
         } else {
-            this.pixelDensityValue = val;
-            if (this.canvas) {
-                this._setCanvasSize(this.canvas.width / this.pixelDensityValue, this.canvas.height / this.pixelDensityValue);
-            }
+            return $._frameRate;
         }
-        strokeWeight(this.strokeWidth);
-        this._setCanvasSize(this.canvas.width, this.canvas.height);
-    }
+    };
 
-    _updateGlobalDimensions() {
-        if (this.dimensionAgnosticMode) {
-            window.width = this.dimensionUnit;
-            window.height = (this.dimensionUnit / this.canvas.width) * this.canvas.height;
-        } else {
-            window.width = this.canvas.width / this.pixelDensityValue;
-            window.height = this.canvas.height / this.pixelDensityValue;
-        }
-    }
+    function _draw(timestamp) {
+        $.resetMatrix();
+        let ts = timestamp || performance.now();
+        $._lastFrameTime ??= ts - $._targetFrameDuration;
 
-    dimensionAgnostic(unit = 400) {
-        this.dimensionAgnosticMode = true;
-        this.dimensionUnit = unit;
-        this._updateGlobalDimensions();
-        this._updateBufferDimensions();
-    }
-
-    _updateBufferDimensions() {
-        for (const key in this.offscreenBuffers) {
-            const buffer = this.offscreenBuffers[key];
-            if (this.dimensionAgnosticMode) {
-                buffer.width = this.dimensionUnit;
-                buffer.height = (this.dimensionUnit / buffer.buffer.width) * buffer.buffer.height;
-            } else {
-                buffer.width = buffer.buffer.width / this.pixelDensityValue;
-                buffer.height = buffer.buffer.height / this.pixelDensityValue;
-            }
-        }
-    }
-
-    createBuffer(w, h) {
-        const buffer = document.createElement('canvas');
-        buffer.width = w
-        buffer.height = h
-        const context = buffer.getContext('2d');
-        if (!this.smooth) {
-            context.imageSmoothingEnabled = false;
-        }
-        const id = this.randomGenerator.random().toString(36).substr(2, 9);
-        this.offscreenBuffers[id] = { buffer, context, width: w, height: h };
-        this._updateBufferDimensions();
-        return this.offscreenBuffers[id];
-    }
-
-    saveCanvas(filename = 'untitled', extension = 'png') {
-        if (!this.canvas) return;
-
-        const validExtensions = ['png', 'jpg'];
-        if (!validExtensions.includes(extension)) {
-            console.error(`Invalid extension: ${extension}. Valid extensions are 'png' and 'jpg'.`);
+        if ($._isLooping || $._shouldDrawOnce) {
+            requestAnimationFrame(_draw);
+        } else if ($.frameCount && !$._redraw) {
             return;
         }
 
-        const mimeType = extension === 'jpg' ? 'image/jpeg' : 'image/png';
-        const dataURL = this.canvas.toDataURL(mimeType);
+        let timeSinceLast = ts - $._lastFrameTime;
+        if (timeSinceLast < $._targetFrameDuration - 1) return;
 
-        const link = document.createElement('a');
-        link.href = dataURL;
-        link.download = `${filename}.${extension}`;
-        link.click();
-    }
+        $.deltaTime = ts - $._lastFrameTime;
+        $._frameRate = 1000 / $.deltaTime;
+        $.frameCount++;
+        window.frameCount = $.frameCount;
+        window.deltaTime = $.deltaTime;
+        if ($.context) $.context.save();
+        if (typeof $.draw === 'function') $.draw();
+        if ($.context) {
+            let prevProps = {
+                fillStyle: $.context.fillStyle,
+                strokeStyle: $.context.strokeStyle,
+                lineWidth: $.context.lineWidth,
+                lineCap: $.context.lineCap,
+                lineJoin: $.context.lineJoin,
+                textAlign: $.context.textAlign,
+                font: $.context.font,
+                globalAlpha: $.context.globalAlpha,
+                globalCompositeOperation: $.context.globalCompositeOperation,
+                filter: $.context.filter,
+                imageSmoothingEnabled: $.context.imageSmoothingEnabled
+            };
 
-    disableContextMenu() {
-        if (this.canvas) {
-            this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+            $.context.restore();
+
+            $.context.fillStyle = prevProps.fillStyle;
+            $.context.strokeStyle = prevProps.strokeStyle;
+            $.context.lineWidth = prevProps.lineWidth;
+            $.context.lineCap = prevProps.lineCap;
+            $.context.lineJoin = prevProps.lineJoin;
+            $.context.textAlign = prevProps.textAlign;
+            $.context.font = prevProps.font;
+            $.context.globalAlpha = prevProps.globalAlpha;
+            $.context.globalCompositeOperation = prevProps.globalCompositeOperation;
+            $.context.filter = prevProps.filter;
+            $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
-    }
-    smooth() {
-        this.smooth = true
-    }
-    noSmooth() {
-        this.smooth = false
-    }
-    noLoop() {
-        this.loopActive = false;
+
+        $._lastFrameTime = ts;
+        $._shouldDrawOnce = false;
     }
 
-    loop() {
-        this.loopActive = true;
-        this._drawLoop();
-    }
-
-    _drawLoop() {
-        if (!this.loopActive) return;
-
-        const now = performance.now();
-        window.deltaTime = now - this.lastFrameTime;
-
-        if (window.deltaTime >= 1000 / this.frameRateValue) {
-            this.lastFrameTime = now - (window.deltaTime % (1000 / this.frameRateValue));
-            window.frameCount++;
-
-            if (typeof draw === 'function') {
-                draw();
-            }
+    $.noLoop = () => { $._isLooping = false; };
+    $.loop = () => { $._isLooping = true; };
+    $.isLooping = () => $._isLooping;
+    $.redraw = (n = 1) => {
+        $._redraw = true;
+        for (let i = 0; i < n; i++) {
+            _draw();
         }
-        this.textureImage = null
-        requestAnimationFrame(() => this._drawLoop());
-    }
+        $._redraw = false;
+    };
 
-    frameRate(value) {
-        if (value !== undefined) {
-            this.frameRateValue = value;
+    $.start = () => {
+        if (typeof $.preload === 'function') {
+            $.preload();
         }
-        return this.frameRateValue;
-    }
 
-    _start() {
-        if (typeof preload === 'function') {
-            preload();
-        }
-        this._initializeCanvas();
-    }
+        // Check if preload function exists and if there are items to preload
+        if (typeof $.preload !== 'function' || window.t5PreloadCount === window.t5PreloadDone) {
+            millisStart = performance.now();
+            if (typeof $.setup === 'function') $.setup();
 
-    _initializeCanvas() {
-        const checkReady = () => {
-            if (this.assetsLoadedCount === this.assetsToLoad) {
-                strokeWeight(1);
-                if (typeof setup === 'function') setup();
-                this.initialized = true;
-                if (typeof draw === 'function') {
-                    if (this.loopActive) {
-                        this._drawLoop();
-                    } else {
-                        draw();
-                    }
+            if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
+            $.resetMatrix();
+
+            $._shouldDrawOnce = true;
+            requestAnimationFrame(() => {
+                _draw();
+                if ($._isLooping) requestAnimationFrame(_draw);
+            });
+        } else {
+            const checkPreloadDone = setInterval(() => {
+                if (window.t5PreloadCount === window.t5PreloadDone) {
+                    clearInterval(checkPreloadDone);
+                    millisStart = performance.now();
+                    if (typeof $.setup === 'function') $.setup();
+
+                    if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
+                    $.resetMatrix();
+
+                    $._shouldDrawOnce = true;
+                    requestAnimationFrame(() => {
+                        _draw();
+                        if ($._isLooping) requestAnimationFrame(_draw);
+                    });
                 }
-            } else {
-                requestAnimationFrame(checkReady);
+            }, 10);
+        }
+    };
+
+
+    if ($._isGlobal) {
+        for (let method of ['setup', 'draw', 'preload', 'windowResized']) {
+            if (window[method]) $[method] = window[method];
+        }
+        for (let key in $) {
+            if ($[key] instanceof Function) window[key] = $[key].bind($);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', $.start);
+
+    for (let m in T5.addOns) {
+        T5.addOns[m]($, p, globalScope);
+    }
+
+    if ($._isGlobal) {
+        globalScope.T5 = T5;
+        window.addEventListener('resize', () => {
+            window.windowWidth = window.innerWidth;
+            window.windowHeight = window.innerHeight;
+            if (typeof $.windowResized === 'function') $.windowResized();
+        });
+    }
+
+}
+
+T5.addOns = {};
+
+if (typeof window === 'object') {
+    window.T5 = T5;
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!T5._hasGlobal) {
+            const instance = new T5('global');
+            instance.setup = window.setup;
+            instance.draw = window.draw;
+            instance.windowResized = window.windowResized;
+            if (window.setup || window.draw) {
+                instance.start();
+            }
+        }
+    });
+}
+
+//************************************************************************//
+//*******************************-T5Cenvas-*******************************//
+//************************************************************************//
+T5.addOns.canvas = ($, p) => {
+    if (!$.t5PixelDensity) {
+        $.t5PixelDensity = 1;
+    }
+
+    $._OffscreenCanvas =
+        window.OffscreenCanvas ||
+        function () {
+            return document.createElement('canvas');
+        };
+    $.defineConstant = function (constantName, value) {
+        const target = $._isGlobal ? window : $;
+        Object.defineProperty(target, constantName, {
+            value: value,
+            writable: false,
+            configurable: false
+        });
+    }
+    $.scaleT5Coord = function (coord, mousePos = false) {
+        if (!$.canvas) {
+            return;
+        }
+        if (!$.dimensionUnit) {
+            $.dimensionUnit = $.canvas.width / $.t5PixelDensity;
+        }
+        return (coord / $.dimensionUnit) * $.canvas.width / $.t5PixelDensity;
+    };
+
+    $.scaleT5Coords = function (coords, mousePos = false) {
+        return coords.map(coord => $.scaleT5Coord(coord, mousePos));
+    };
+
+    $.scaleT5Mouse = function (coord) {
+        if (!$.canvas) {
+            return;
+        }
+        if (!$.dimensionUnit) {
+            $.dimensionUnit = $.canvas.width / $.t5PixelDensity;
+        }
+        return (coord / $.canvas.width) * $.dimensionUnit;
+    };
+    $.createCanvas = function (w, h, renderer, options) {
+        if (typeof renderer == 'object') options = renderer;
+        p.canvas = $.createElement('canvas').element;
+        $.canvas = p.canvas;
+        p.canvas.width = (w || window.innerWidth) * $.t5PixelDensity;
+        p.canvas.height = (h || window.innerHeight) * $.t5PixelDensity;
+        p.canvas.style.width = `${w || window.innerWidth}px`;
+        p.canvas.style.height = `${h || window.innerHeight}px`;
+        $.width = w || window.innerWidth;
+        $.height = h || window.innerHeight;
+        p.context = p.canvas.getContext('2d');
+        p.canvas.ctx = p.context;
+        p.canvas.context = p.context;
+        document.body.appendChild(p.canvas);
+        window.drawingContext = p.context;
+        window.width = $.width;
+        window.height = $.height;
+        window.canvasWidth = p.canvas.width;
+        window.canvasHeight = p.canvas.height;
+        window.canvas = p.canvas;
+        window.context = p.context;
+
+        $.ctx = $.context = p.context;
+
+        // Set default styles
+        $.ctx.fillStyle = 'rgb(255, 255, 255)';
+        $.ctx.strokeStyle = 'rgb(0, 0, 0)';
+        $.ctx.lineCap = 'round';
+        $.ctx.lineJoin = 'miter';
+        $.ctx.textAlign = 'left';
+
+        $.ctx.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        $.ctx.save();
+
+        if ($._isGlobal) {
+            Object.defineProperty(window, 'width', {
+                get: function () { return $.width; },
+                configurable: true,
+            });
+            Object.defineProperty(window, 'height', {
+                get: function () { return $.height; },
+                configurable: true,
+            });
+        }
+
+        // Scale the canvas context for pixel density
+        $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
+
+        return new T5Element(p.canvas);
+    };
+
+    $.resizeCanvas = function (w, h) {
+        let prevProps = {
+            fillStyle: $.context.fillStyle,
+            strokeStyle: $.context.strokeStyle,
+            lineWidth: $.context.lineWidth,
+            lineCap: $.context.lineCap,
+            lineJoin: $.context.lineJoin,
+            textAlign: $.context.textAlign,
+            font: $.context.font,
+            globalAlpha: $.context.globalAlpha,
+            globalCompositeOperation: $.context.globalCompositeOperation,
+            filter: $.context.filter,
+            imageSmoothingEnabled: $.context.imageSmoothingEnabled
+        };
+
+        p.canvas.width = w * $.t5PixelDensity;
+        p.canvas.height = h * $.t5PixelDensity;
+        p.canvas.style.width = `${w}px`;
+        p.canvas.style.height = `${h}px`;
+        $.width = w;
+        $.height = h;
+        window.width = w;
+        window.height = h;
+
+        window.canvasWidth = p.canvas.width;
+        window.canvasHeight = p.canvas.height;
+        if (window.isFlexCanvas) {
+            window.width = $.dimensionUnit;
+            window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+        }
+        if ($.context) {
+            $.context.scale($.t5PixelDensity, $.t5PixelDensity);
+
+            // Restore previous properties
+            $.context.fillStyle = prevProps.fillStyle;
+            $.context.strokeStyle = prevProps.strokeStyle;
+            $.context.lineWidth = prevProps.lineWidth;
+            $.context.lineCap = prevProps.lineCap;
+            $.context.lineJoin = prevProps.lineJoin;
+            $.context.textAlign = prevProps.textAlign;
+            $.context.font = prevProps.font;
+            $.context.globalAlpha = prevProps.globalAlpha;
+            $.context.globalCompositeOperation = prevProps.globalCompositeOperation;
+            $.context.filter = prevProps.filter;
+            $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
+        }
+
+    };
+
+    $.noCanvas = () => {
+        if ($.canvas?.remove) $.canvas.remove();
+        $.canvas = 0;
+        p.context = p.drawingContext = 0;
+    };
+
+    $.resetMatrix = function () {
+        if ($.context) {
+            let prevProps = {
+                fillStyle: $.context.fillStyle,
+                strokeStyle: $.context.strokeStyle,
+                lineWidth: $.context.lineWidth,
+                lineCap: $.context.lineCap,
+                lineJoin: $.context.lineJoin,
+                textAlign: $.context.textAlign,
+                font: $.context.font,
+                globalAlpha: $.context.globalAlpha,
+                globalCompositeOperation: $.context.globalCompositeOperation,
+                filter: $.context.filter,
+                imageSmoothingEnabled: $.context.imageSmoothingEnabled
+            };
+
+            $.context.resetTransform();
+            $.context.scale($.t5PixelDensity, $.t5PixelDensity);
+
+            // Restore the previous properties
+            $.context.fillStyle = prevProps.fillStyle;
+            $.context.strokeStyle = prevProps.strokeStyle;
+            $.context.lineWidth = prevProps.lineWidth;
+            $.context.lineCap = prevProps.lineCap;
+            $.context.lineJoin = prevProps.lineJoin;
+            $.context.textAlign = prevProps.textAlign;
+            $.context.font = prevProps.font;
+            $.context.globalAlpha = prevProps.globalAlpha;
+            $.context.globalCompositeOperation = prevProps.globalCompositeOperation;
+            $.context.filter = prevProps.filter;
+            $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
+        }
+    };
+
+    $.translate = function (x, y) {
+        if ($.context) {
+            $.context.translate(x, y);
+        }
+    };
+
+    $.rotate = function (angle) {
+        if ($.context) {
+            $.context.rotate(angle);
+        }
+    };
+
+    $.scale = function (x, y) {
+        if ($.context) {
+            $.context.scale(x, y);
+        }
+    };
+
+    $.push = function () {
+        if ($.context) {
+            $.context.save();
+        }
+    };
+
+    $.pop = function () {
+        if ($.context) {
+            $.context.restore();
+        }
+    };
+
+    $.shearX = function (angle) {
+        if ($.context) {
+            $.context.transform(1, 0, Math.tan(angle), 1, 0, 0);
+        }
+    };
+
+    $.shearY = function (angle) {
+        if ($.context) {
+            $.context.transform(1, Math.tan(angle), 0, 1, 0, 0);
+        }
+    };
+
+    $.pixelDensity = function (density) {
+        if (density === undefined) {
+            return $.t5PixelDensity;
+        } else {
+            $.t5PixelDensity = density;
+            if ($.canvas) {
+                $.resizeCanvas($.width, $.height);
+            }
+        }
+    };
+
+    $.flexibleCanvas = function (dimensionUnit) {
+        $.dimensionUnit = dimensionUnit
+        window.isFlexCanvas = true;
+        window.width = $.dimensionUnit;
+        window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+    };
+
+    $.get = function (x, y, w, h) {
+        if (x === undefined) {
+            return $.ctx.getImageData(0, 0, $.width, $.height);
+        } else if (w === undefined) {
+            return $.ctx.getImageData(x, y, 1, 1).data;
+        } else {
+            return $.ctx.getImageData(x, y, w, h);
+        }
+    };
+
+    $.copy = function (src, sx, sy, sw, sh, dx, dy, dw, dh) {
+        let source;
+
+        if (src instanceof $.Graphics) {
+            source = src.canvas;
+        } else if (src instanceof T5Element) {
+            source = src.element;
+        } else if (src instanceof HTMLCanvasElement || src instanceof Image) {
+            source = src;
+        } else if (src && src.canvas instanceof HTMLCanvasElement) {
+            source = src.canvas;
+        } else {
+            source = $.canvas;
+        }
+
+        if (source instanceof HTMLCanvasElement || source instanceof Image) {
+            $.ctx.drawImage(source, sx, sy, sw, sh, dx, dy, dw, dh);
+        } else {
+            console.error("Invalid source for copy function");
+        }
+    };
+
+    $.remove = function () {
+        if ($.canvas?.remove) {
+            $.canvas.remove();
+        }
+    };
+
+    $.loadPixels = function () {
+        if (!$.pixels) {
+            $.pixels = $.ctx.getImageData(0, 0, $.width, $.height);
+        } else {
+            const newPixels = $.ctx.getImageData(0, 0, $.width, $.height);
+            $.pixels.data.set(newPixels.data);
+        }
+        $.pixelData = $.pixels.data;
+        if ($._isGlobal) {
+            window.pixels = $.pixelData;
+        } else {
+            p.pixels = $.pixelData;
+        }
+    };
+
+    $.updatePixels = function (x, y, w, h) {
+        if (x === undefined || y === undefined || w === undefined || h === undefined) {
+            $.ctx.putImageData($.pixels, 0, 0);
+        } else {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = $.pixels.width;
+            tempCanvas.height = $.pixels.height;
+            tempCtx.putImageData($.pixels, 0, 0);
+            $.ctx.drawImage(tempCanvas, x, y, w, h, x, y, w, h);
+        }
+    };
+    if ($._isGlobal) {
+        window.loadPixels = $.loadPixels.bind($);
+        window.updatePixels = $.updatePixels.bind($);
+    }
+
+    $.defineConstant('BLEND', 'source-over');
+    $.defineConstant('REMOVE', 'destination-out');
+    $.defineConstant('ADD', 'lighter');
+    $.defineConstant('DARKEST', 'darken');
+    $.defineConstant('LIGHTEST', 'lighten');
+    $.defineConstant('DIFFERENCE', 'difference');
+    $.defineConstant('SUBTRACT', 'subtract');
+    $.defineConstant('EXCLUSION', 'exclusion');
+    $.defineConstant('MULTIPLY', 'multiply');
+    $.defineConstant('SCREEN', 'screen');
+    $.defineConstant('REPLACE', 'copy');
+    $.defineConstant('OVERLAY', 'overlay');
+    $.defineConstant('HARD_LIGHT', 'hard-light');
+    $.defineConstant('SOFT_LIGHT', 'soft-light');
+    $.defineConstant('DODGE', 'color-dodge');
+    $.defineConstant('BURN', 'color-burn');
+
+    $.blendMode = function (mode) {
+        if ($.context) {
+            $.context.globalCompositeOperation = mode;
+        }
+    };
+
+    $.defineConstant('THRESHOLD', 'THRESHOLD');
+    $.defineConstant('GRAY', 'GRAY');
+    $.defineConstant('OPAQUE', 'OPAQUE');
+    $.defineConstant('INVERT', 'INVERT');
+    $.defineConstant('POSTERIZE', 'POSTERIZE');
+    $.defineConstant('DILATE', 'DILATE');
+    $.defineConstant('ERODE', 'ERODE');
+    $.defineConstant('BLUR', 'BLUR');
+
+    $.filter = function (mode, value) {
+        if (!$.context) return;
+
+        const tmpCanvas = document.createElement('canvas');
+        const tmpCtx = tmpCanvas.getContext('2d');
+        tmpCanvas.width = $.canvas.width;
+        tmpCanvas.height = $.canvas.height;
+
+        tmpCtx.drawImage($.canvas, 0, 0);
+
+        const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
+        const data = imageData.data;
+
+        switch (mode) {
+            case GRAY:
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = 0.155 * data[i] + 0.597 * data[i + 1] + 0.319 * data[i + 2];
+                    data[i] = gray;
+                    data[i + 1] = gray;
+                    data[i + 2] = gray;
+                }
+                break;
+
+            case INVERT:
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = 255 - data[i];
+                    data[i + 1] = 255 - data[i + 1];
+                    data[i + 2] = 255 - data[i + 2];
+                }
+                break;
+
+            case POSTERIZE:
+                if (value < 2 || value > 255) {
+                    throw new Error('Posterize value must be between 2 and 255');
+                }
+                let lvl = value;
+                let lvl1 = lvl - 1;
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i] = (((data[i] * lvl) >> 8) * 255) / lvl1;
+                    data[i + 1] = (((data[i + 1] * lvl) >> 8) * 255) / lvl1;
+                    data[i + 2] = (((data[i + 2] * lvl) >> 8) * 255) / lvl1;
+                }
+                tmpCtx.putImageData(imageData, 0, 0);
+                $.ctx.drawImage(tmpCanvas, 0, 0);
+                break;
+
+            case THRESHOLD:
+                const threshold = value !== undefined ? value * 255 : 128;
+                for (let i = 0; i < data.length; i += 4) {
+                    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                    const val = avg >= threshold ? 255 : 0;
+                    data[i] = val;
+                    data[i + 1] = val;
+                    data[i + 2] = val;
+                }
+                break;
+
+            case OPAQUE:
+                for (let i = 0; i < data.length; i += 4) {
+                    data[i + 3] = 255;
+                }
+                break;
+
+            case BLUR:
+            case DILATE:
+            case ERODE:
+                $.context.filter = mode.toLowerCase() + (value ? `(${value}px)` : '');
+                $.context.drawImage(tmpCanvas, 0, 0);
+                $.context.filter = 'none';
+                return;
+
+            default:
+                throw new Error('Unsupported filter mode: ' + mode);
+        }
+
+        tmpCtx.putImageData(imageData, 0, 0);
+        $.context.drawImage(tmpCanvas, 0, 0);
+    };
+
+    $.defineConstant('LABEL', 'LABEL');
+    $.defineConstant('FALLBACK', 'FALLBACK');
+
+    $.describe = function (text, display) {
+        const canvas = $.canvas || p.canvas;
+        if (!canvas) return;
+
+        // Remove existing description if present
+        const existingDescription = document.getElementById('t5-canvas-description');
+        if (existingDescription) {
+            existingDescription.remove();
+        }
+
+        // Create a new description element
+        const description = document.createElement('div');
+        description.id = 't5-canvas-description';
+        description.innerText = text;
+        description.style.position = 'absolute';
+        description.style.clip = 'rect(1px, 1px, 1px, 1px)';
+        description.style.height = '1px';
+        description.style.margin = '-1px';
+        description.style.overflow = 'hidden';
+        description.style.padding = '0';
+        description.style.width = '1px';
+        description.style.border = '0';
+
+        if (display === 'LABEL') {
+            description.style.position = 'relative';
+            description.style.clip = 'auto';
+            description.style.height = 'auto';
+            description.style.margin = '10px 0';
+            description.style.overflow = 'visible';
+            description.style.padding = '0';
+            description.style.width = 'auto';
+            description.style.border = '0';
+        }
+
+        canvas.setAttribute('aria-label', text);
+        canvas.parentNode.insertBefore(description, canvas.nextSibling);
+    };
+};
+// Integrate the canvas add-on
+T5.addOns.canvas(T5.prototype, T5.prototype);
+//************************************************************************//
+//******************************-T5Graphics-******************************//
+//************************************************************************//
+T5.addOns.createGraphics = ($, p) => {
+    class Graphics extends T5 {
+        constructor(w, h, parent) {
+            super('local', parent);
+            this.canvas = $.createElement('canvas').element;
+            this.canvas.width = w;
+            this.canvas.height = h;
+            this.context = this.canvas.getContext('2d');
+            this.ctx = this.context;
+            this.width = w;
+            this.height = h;
+            this._offscreen = true;
+            this.context.fillStyle = 'rgb(255, 255, 255)';
+            this.context.strokeStyle = 'rgb(0, 0, 0)';
+            this.canvas.style.display = 'none';
+            document.body.appendChild(this.canvas);
+            this.ctx = this.context = this.canvas.getContext('2d');
+        }
+    }
+
+    $.createGraphics = function (w, h) {
+        return new Graphics(w, h, $);
+    };
+
+    $.Graphics = Graphics;
+};
+
+T5.addOns.createGraphics(T5.prototype, T5.prototype);
+//************************************************************************//
+//******************************-T5Colors-********************************//
+//************************************************************************//
+T5.addOns.colors = ($, p) => {
+    class ColorRGBA {
+        constructor(r, g, b, a = 255) {
+            this.r = r;
+            this.g = g;
+            this.b = b;
+            this.a = a;
+        }
+
+        setRed(v) { this.r = v; }
+        setGreen(v) { this.g = v; }
+        setBlue(v) { this.b = v; }
+        setAlpha(v) { this.a = v; }
+
+        get levels() {
+            return [this.r, this.g, this.b, this.a];
+        }
+
+        toString() {
+            return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+        }
+    }
+
+    function parseColorString(colorStr) {
+        let r, g, b, a = 255;
+        if (colorStr.startsWith('#')) {
+            const hex = colorStr.slice(1);
+            if (hex.length === 8) {
+                r = parseInt(hex.slice(0, 2), 16);
+                g = parseInt(hex.slice(2, 4), 16);
+                b = parseInt(hex.slice(4, 6), 16);
+                a = parseInt(hex.slice(6, 8), 16);
+            } else if (hex.length === 6) {
+                r = parseInt(hex.slice(0, 2), 16);
+                g = parseInt(hex.slice(2, 4), 16);
+                b = parseInt(hex.slice(4, 6), 16);
+            } else if (hex.length === 3) {
+                r = parseInt(hex[0] + hex[0], 16);
+                g = parseInt(hex[1] + hex[1], 16);
+                b = parseInt(hex[2] + hex[2], 16);
+            }
+            return new ColorRGBA(r, g, b, a);
+        } else if (colorStr.startsWith('rgba')) {
+            const values = colorStr.match(/\d+(\.\d+)?/g).map(Number);
+            r = values[0];
+            g = values[1];
+            b = values[2];
+            a = values[3] * 255;
+            return new ColorRGBA(r, g, b, a);
+        } else if (colorStr.startsWith('rgb')) {
+            const values = colorStr.match(/\d+(\.\d+)?/g).map(Number);
+            r = values[0];
+            g = values[1];
+            b = values[2];
+            return new ColorRGBA(r, g, b, a);
+        } else if (colorStr.startsWith('hsla')) {
+            const values = colorStr.match(/\d+(\.\d+)?/g).map(Number);
+            const h = values[0] / 360;
+            const s = values[1] / 100;
+            const l = values[2] / 100;
+            a = values[3] * 255;
+            const [r, g, b] = hslToRgb(h, s, l);
+            return new ColorRGBA(r, g, b, a);
+        } else if (colorStr.startsWith('hsl')) {
+            const values = colorStr.match(/\d+(\.\d+)?/g).map(Number);
+            const h = values[0] / 360;
+            const s = values[1] / 100;
+            const l = values[2] / 100;
+            const [r, g, b] = hslToRgb(h, s, l);
+            return new ColorRGBA(r, g, b, a);
+        } else {
+            const tempElem = document.createElement('div');
+            tempElem.style.color = colorStr;
+            document.body.appendChild(tempElem);
+            const rgb = window.getComputedStyle(tempElem).color.match(/\d+/g).map(Number);
+            document.body.removeChild(tempElem);
+            return new ColorRGBA(rgb[0], rgb[1], rgb[2], a);
+        }
+    }
+
+    function hslToRgb(h, s, l) {
+        let r, g, b;
+        if (s == 0) {
+            r = g = b = l;
+        } else {
+            const hue2rgb = (p, q, t) => {
+                if (t < 0) t += 1;
+                if (t > 1) t -= 1;
+                if (t < 1 / 6) return p + (q - p) * 6 * t;
+                if (t < 1 / 2) return q;
+                if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                return p;
+            };
+            const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+            const p = 2 * l - q;
+            r = hue2rgb(p, q, h + 1 / 3);
+            g = hue2rgb(p, q, h);
+            b = hue2rgb(p, q, h - 1 / 3);
+        }
+        return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    $.color = function (...args) {
+        if (args.length === 1 && typeof args[0] === 'string') {
+            return parseColorString(args[0]);
+        } else if (args.length === 1 && typeof args[0] === 'number') {
+            return new ColorRGBA(args[0], args[0], args[0]);
+        } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
+            return new ColorRGBA(args[0], args[0], args[0], args[1]);
+        } else if (args.length >= 3) {
+            return new ColorRGBA(args[0], args[1], args[2], args[3]);
+        }
+        return null;
+    };
+
+    $.isColorObject = function (obj) {
+        return obj instanceof ColorRGBA;
+    };
+
+    function handleColorArgument(args) {
+        if (args.length === 1 && $.isColorObject(args[0])) {
+            return args[0].toString();
+        } else {
+            const colorObj = $.color(...args);
+            return colorObj ? colorObj.toString() : null;
+        }
+    }
+
+    $.fill = function (...args) {
+        const colorString = handleColorArgument(args);
+        if (colorString) {
+            $.context.fillStyle = colorString;
+            $.textFillColor = colorString;
+        }
+    };
+
+    $.stroke = function (...args) {
+        const colorString = handleColorArgument(args);
+        if (colorString) {
+            $.context.strokeStyle = colorString;
+            $.textStrokeColor = colorString;
+        }
+    };
+
+    $.background = function (...args) {
+        const colorString = handleColorArgument(args);
+        if (colorString) {
+            $.context.save();
+            $.context.fillStyle = colorString;
+            $.context.fillRect(0, 0, $.canvas.width, $.canvas.height);
+            $.context.restore();
+        }
+    };
+
+    $.noFill = function () {
+        $.context.fillStyle = 'rgba(0,0,0,0)';
+        $.textFillColor = 'rgba(0,0,0,0)';
+    };
+
+    $.noStroke = function () {
+        $.context.strokeStyle = 'rgba(0,0,0,0)';
+        $.textStrokeColor = 'rgba(0,0,0,0)';
+    };
+
+    $.smooth = function () {
+        $.context.imageSmoothingEnabled = true
+    };
+    $.noSmooth = function () {
+        $.context.imageSmoothingEnabled = false;
+    };
+    $.noAntialiasing = function () {
+        $.context.filter = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxmaWx0ZXIgaWQ9ImZpbHRlciIgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jUiB0eXBlPSJpZGVudGl0eSIvPjxmZUZ1bmNHIHR5cGU9ImlkZW50aXR5Ii8+PGZlRnVuY0IgdHlwZT0iaWRlbnRpdHkiLz48ZmVGdW5jQSB0eXBlPSJkaXNjcmV0ZSIgdGFibGVWYWx1ZXM9IjAgMSIvPjwvZmVDb21wb25lbnRUcmFuc2Zlcj48L2ZpbHRlcj48L3N2Zz4=#filter)"
+    };
+    $.antialiasing = function () {
+        $.context.filter = "none"
+    };
+    $.currentTint = null;
+    $.tint = function (...args) {
+        const colorString = handleColorArgument(args);
+        if (colorString) {
+            $.currentTint = colorString;
+        }
+    };
+
+    $.noTint = function () {
+        $.currentTint = null;
+    };
+
+    // Extract color components
+    $.red = function (col) {
+        const colorObj = $.color(col);
+        return colorObj.r;
+    };
+
+    $.green = function (col) {
+        const colorObj = $.color(col);
+        return colorObj.g;
+    };
+
+    $.blue = function (col) {
+        const colorObj = $.color(col);
+        return colorObj.b;
+    };
+
+    $.alpha = function (col) {
+        const colorObj = $.color(col);
+        return colorObj.a;
+    };
+    $.lerpColor = function (c1, c2, amt) {
+        // Ensure amt is clamped between 0 and 1
+        amt = Math.max(0, Math.min(1, amt));
+
+        // Parse the colors
+        const color1 = $.isColorObject(c1) ? c1 : $.color(c1);
+        const color2 = $.isColorObject(c2) ? c2 : $.color(c2);
+
+        // Calculate the interpolated color components
+        const r = Math.round($.lerp(color1.r, color2.r, amt));
+        const g = Math.round($.lerp(color1.g, color2.g, amt));
+        const b = Math.round($.lerp(color1.b, color2.b, amt));
+        const a = Math.round($.lerp(color1.a, color2.a, amt));
+
+        // Return the new color
+        return new ColorRGBA(r, g, b, a);
+    };
+
+    // Linear interpolation function
+    $.lerp = function (start, stop, amt) {
+        return start + (stop - start) * amt;
+    };
+
+    $.erase = function (fillAlpha = 255, strokeAlpha = 255) {
+        $.context.save();
+        $.context.globalCompositeOperation = 'destination-out';
+        $.context.fillStyle = `rgba(0, 0, 0, ${fillAlpha / 255})`;
+        $.context.strokeStyle = `rgba(0, 0, 0, ${strokeAlpha / 255})`;
+    };
+
+    $.noErase = function () {
+        $.context.globalCompositeOperation = 'source-over';
+        $.context.restore();
+    };
+};
+
+T5.addOns.colors(T5.prototype, T5.prototype);
+
+//************************************************************************//
+//********************************-T5Image-*******************************//
+//************************************************************************//
+T5.addOns.image = ($, p) => {
+    class T5Image {
+        constructor(img) {
+            this.img = img;
+            this.width = img.width;
+            this.height = img.height;
+        }
+    }
+
+    $.loadImage = function (path, callback) {
+        window.t5PreloadCount++;
+        const img = new Image();
+        const t5Img = new T5Image(img);
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => {
+            window.t5PreloadDone++;
+            if (callback) {
+                callback(t5Img);
             }
         };
-        checkReady();
-    }
+        img.onerror = (err) => {
+            window.t5PreloadDone++;
+            console.error(`Failed to load image at path: ${path}. Please check your image path.`);
+        };
+        img.src = path;
+        return t5Img;
+    };
 
-    _handleResize() {
-        window.windowWidth = window.innerWidth;
-        window.windowHeight = window.innerHeight;
-        for (const callback of this.resizeCallbacks) {
-            callback();
-        }
-    }
 
-    windowResized(callback) {
-        this.resizeCallbacks.push(callback);
-    }
+    // Create a temporary canvas for tinting operations
 
-    drawToBuffer(buffer) {
-        if (buffer) {
-            this.currentBuffer = buffer;
-            this.context = buffer.context;
+    let tmpCanvas = null;
+    function makeTmpCtx(width, height) {
+        if (tmpCanvas != null) {
+            return tmpCanvas.tmpCtx
         } else {
-            this.currentBuffer = null;
-            this.context = this.canvas.getContext('2d');
+            tmpCanvas = document.createElement('canvas');
+            tmpCanvas.tmpCtx = tmpCanvas.getContext('2d');
+            tmpCanvas.width = width;
+            tmpCanvas.height = height;
+            return tmpCanvas.tmpCtx
         }
     }
 
-    drawToCanvas() {
-        this.currentBuffer = null;
-        this.context = this.canvas.getContext('2d');
+    function extractRGBFromColorString(colorString) {
+        const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+        return rgbaMatch ? `rgb(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]})` : colorString;
     }
 
-    fill(...args) {
-        this.fillStyle = this._processColorArgs(args);
-        this.textureImage = null;
+    function extractAlphaFromColorString(colorString) {
+        const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+        return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
     }
 
-    noFill() {
-        this.fillStyle = null;
-        this.textureImage = null;
-    }
-
-    stroke(...args) {
-        this.strokeStyle = this._processColorArgs(args);
-    }
-
-    noStroke() {
-        this.strokeStyle = null;
-    }
-
-    setStrokeType(type) {
-        this.strokeType = type;
-    }
-
-    strokeWeight(weight) {
-        if (weight <= 0) {
-            this.strokeStyle = null;
-            this.strokeWidth = 0;
+    $.image = function (img, x, y, w, h) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+        if (!img) return;
+        let source;
+        if (img instanceof T5Image) {
+            source = img.img;
+        } else if (img instanceof $.Graphics) {
+            source = img.canvas;
+        } else if (img instanceof Image) {
+            source = img;
+        } else if (img.img) {
+            source = img.img
         } else {
-            this.strokeWidth = this._scaleCoordinate(weight);
+            throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
-    }
+        let offset = $.scaleT5Coord(0.65)
+        let width = w + offset || $.scaleT5Coord(source.width) + offset;
+        let height = h + offset || $.scaleT5Coord(source.height) + offset;
 
-    background(...args) {
-        this.backgroundColor = this._processColorArgs(args);
-        this.backgroundSet = true;
-        this._drawBackground();
-    }
+        if ($.currentTint) {
+            const tmpCtx = makeTmpCtx(width, height);
 
-    borderRadius(...radii) {
-        this.borderRadii = radii;
-    }
+            // Draw the image to the temporary canvas
+            tmpCtx.clearRect(0, 0, width, height);
+            tmpCtx.drawImage(source, 0, 0, width, height);
 
-    loadImage(path, callback) {
-        const img = new Image();
-        const self = this;
-        const req = new Request(path, {
-            method: 'GET',
-            mode: 'cors'
-        });
+            // Extract RGB and Alpha values from the current tint
+            const tintRGB = extractRGBFromColorString($.currentTint);
+            const tintAlpha = extractAlphaFromColorString($.currentTint);
 
-        fetch(req).then(function (response) {
-            if (!response.ok) {
-                throw new Error(`Network response was not ok: ${response.statusText}`);
+            // Apply the tint color using the 'multiply' blend mode
+            tmpCtx.globalCompositeOperation = 'multiply';
+            tmpCtx.fillStyle = tintRGB;
+            tmpCtx.fillRect(0, 0, width, height);
+
+            // Draw the tinted image back to the main canvas with the correct alpha
+            $.context.save();
+            $.context.globalAlpha = tintAlpha;
+            $.context.drawImage(tmpCanvas, x, y, width, height);
+            $.context.globalAlpha = 1; // Reset alpha to default
+            $.context.restore();
+        } else {
+            $.context.drawImage(source, x, y, width, height);
+        }
+    };
+};
+
+T5.addOns.image(T5.prototype, T5.prototype);
+//************************************************************************//
+//********************************-T5Draw-********************************//
+//************************************************************************//
+T5.addOns.draw = ($, p) => {
+
+    // Constants
+    $.defineConstant('CLOSE', true);
+    $.defineConstant('OPEN', false);
+    $.defineConstant('ROUND', 'round');
+    $.defineConstant('SQUARE', 'butt');
+    $.defineConstant('PROJECT', 'square');
+    $.defineConstant('MITER', 'miter');
+    $.defineConstant('BEVEL', 'bevel');
+
+    $.defineConstant('RADIUS', 'radius');
+    $.defineConstant('CORNER', 'corner');
+    $.defineConstant('CORNERS', 'corners');
+    $.rect = function (x, y, w, h = w) {
+        if ($.context) {
+            if ($.borderRadii.length > 0) {
+                $.beginShape()
+                $.vertex(x, y)
+                $.vertex(x + w, y)
+                $.vertex(x + w, y + h)
+                $.vertex(x, y + h)
+                $.endShape(CLOSE)
+            } else {
+                [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+                $.context.beginPath();
+                $.context.rect(x, y, w, h);
+                $.context.fill();
+                $.context.stroke();
             }
-            return response.blob();
-        }).then(function (blob) {
-            const url = URL.createObjectURL(blob);
-            img.src = url;
+        }
+    };
 
-            img.onload = function () {
-                self.textureCache[path] = img;
-                self.assetsLoadedCount++;
-                if (callback) {
-                    callback(img);
+    $.square = function (x, y, w, h = w) {
+        $.rect(x, y, w, h);
+    };
+
+    $.fillRect = function (x, y, w, h = w) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+        if ($.context) {
+            $.context.fillRect(x, y, w, h);
+        }
+    };
+
+    $.ellipse = function (x, y, w, h = w) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+        if ($.context) {
+            $.context.beginPath();
+            $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+            $.context.fill();
+            $.context.stroke();
+        }
+    };
+
+    $.circle = function (x, y, w, h = w) {
+        $.ellipse(x, y, w, h);
+    };
+
+    $.line = function (x1, y1, x2, y2) {
+        [x1, y1, x2, y2] = $.scaleT5Coords([x1, y1, x2, y2]);
+        if ($.context) {
+            $.context.beginPath();
+            $.context.moveTo(x1, y1);
+            $.context.lineTo(x2, y2);
+            $.context.stroke();
+        }
+    };
+
+    $.strokeWeight = function (weight) {
+        weight = $.scaleT5Coord(weight)
+        if (weight == 0) {
+            $.context.strokeStyle = 'rgba(0,0,0,0)';
+        }
+        if ($.context) $.context.lineWidth = weight;
+    };
+
+    $.quad = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+        if ($.context) {
+            if ($.borderRadii.length > 0) {
+                $.beginShape()
+                $.vertex(x1, y1)
+                $.vertex(x2, y2)
+                $.vertex(x3, y3)
+                $.vertex(x4, y4)
+                $.endShape(CLOSE)
+            } else {
+                [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
+                $.context.beginPath();
+                $.context.moveTo(x1, y1);
+                $.context.lineTo(x2, y2);
+                $.context.lineTo(x3, y3);
+                $.context.lineTo(x4, y4);
+                $.context.closePath();
+                $.context.fill();
+                $.context.stroke();
+            }
+        }
+    };
+
+    $.triangle = function (x1, y1, x2, y2, x3, y3) {
+        if ($.context) {
+            if ($.borderRadii.length > 0) {
+                $.beginShape()
+                $.vertex(x1, y1)
+                $.vertex(x2, y2)
+                $.vertex(x3, y3)
+                $.endShape(CLOSE)
+            } else {
+                [x1, y1, x2, y2, x3, y3] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3]);
+                $.context.beginPath();
+                $.context.moveTo(x1, y1);
+                $.context.lineTo(x2, y2);
+                $.context.lineTo(x3, y3);
+                $.context.closePath();
+                $.context.fill();
+                $.context.stroke();
+            }
+        }
+    };
+
+    let currentShapeVertices = [];
+    let currentShapeMode = '';
+
+    $.beginShape = function (mode = 'LINES') {
+        currentShapeVertices = [];
+        currentShapeMode = mode;
+    };
+
+    $.vertex = function (x, y) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        currentShapeVertices.push({ x, y, type: 'vertex' });
+    };
+
+    $.bezierVertex = function (cp1x, cp1y, cp2x, cp2y, x, y) {
+        [cp1x, cp1y, cp2x, cp2y, x, y] = $.scaleT5Coords([cp1x, cp1y, cp2x, cp2y, x, y]);
+        currentShapeVertices.push({ cp1x, cp1y, cp2x, cp2y, x, y, type: 'bezier' });
+    };
+
+    $.curveVertex = function (x, y) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        currentShapeVertices.push({ x, y, type: 'curve' });
+    };
+
+    $.borderRadii = [];
+
+    $.borderRadius = function (...radii) {
+        if (radii == null || radii == undefined || radii == 'none') {
+            $.borderRadii = []
+        }
+        $.borderRadii = radii;
+    };
+    $.noBorderRadius = function () {
+        $.borderRadii = []
+    }
+
+    $.endShape = function (CLOSE) {
+        if ($.context && currentShapeVertices.length > 0) {
+            $.context.beginPath();
+
+            if ($.borderRadii.length > 0) {
+                _drawPathWithBorderRadius($.context, currentShapeVertices, CLOSE);
+            } else {
+                // Check if the shape starts with a curve vertex
+                if (currentShapeVertices[0].type === 'curve') {
+                    let vertices = [...currentShapeVertices];
+
+                    // Add phantom points at the beginning and end
+                    vertices.unshift(vertices[0]);
+                    vertices.push(vertices[vertices.length - 1]);
+
+                    // Move to the first actual point
+                    $.context.moveTo(vertices[1].x, vertices[1].y);
+
+                    for (let i = 1; i < vertices.length - 2; i++) {
+                        let p0 = vertices[i - 1];
+                        let p1 = vertices[i];
+                        let p2 = vertices[i + 1];
+                        let p3 = vertices[i + 2];
+
+                        for (let t = 0; t <= 1; t += 0.1) {
+                            let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
+                                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
+                                (-p0.x + p2.x) * t +
+                                2 * p1.x);
+
+                            let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
+                                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
+                                (-p0.y + p2.y) * t +
+                                2 * p1.y);
+
+                            $.context.lineTo(x, y);
+                        }
+                    }
+                    // Line to the last actual point
+                    $.context.lineTo(vertices[vertices.length - 2].x, vertices[vertices.length - 2].y);
+
                 } else {
-                    self.textureImg = img;
+                    // Start at the first vertex if not a curve
+                    let startVertex = currentShapeVertices[0];
+                    $.context.moveTo(startVertex.x, startVertex.y);
+
+                    for (let i = 1; i < currentShapeVertices.length; i++) {
+                        let currentVertex = currentShapeVertices[i];
+                        if (currentVertex.type === 'vertex') {
+                            $.context.lineTo(currentVertex.x, currentVertex.y);
+                        } else if (currentVertex.type === 'bezier') {
+                            $.context.bezierCurveTo(
+                                currentVertex.cp1x,
+                                currentVertex.cp1y,
+                                currentVertex.cp2x,
+                                currentVertex.cp2y,
+                                currentVertex.x,
+                                currentVertex.y
+                            );
+                        } else if (currentVertex.type === 'curve') {
+                            // Add phantom points at the beginning and end for curve calculations
+                            let p0 = currentShapeVertices[i - 1];
+                            let p1 = currentVertex;
+                            let p2 = currentShapeVertices[i + 1] || currentVertex;
+                            let p3 = currentShapeVertices[i + 2] || p2;
+
+                            for (let t = 0; t <= 1; t += 0.1) {
+                                let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
+                                    (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
+                                    (-p0.x + p2.x) * t +
+                                    2 * p1.x);
+
+                                let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
+                                    (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
+                                    (-p0.y + p2.y) * t +
+                                    2 * p1.y);
+
+                                $.context.lineTo(x, y);
+                            }
+                        }
+                    }
                 }
-                URL.revokeObjectURL(url);
-            };
 
-            img.onerror = function (e) {
-                console.error(`Failed to load image: ${path}`, e);
-                self.assetsLoadedCount++;
-                if (callback) {
-                    callback(null);
+                if (CLOSE) {
+                    $.context.closePath();
                 }
-            };
-        }).catch(function (e) {
-            console.error(`Failed to fetch image: ${path}`, e);
-            if (callback) {
-                callback(null);
-            }
-        });
-
-        this.assetsToLoad++;
-        return img;
-    }
-
-    setTexture(imageOrBuffer, mode = 'cover') {
-        this.textureMode = mode;
-        if (imageOrBuffer instanceof HTMLCanvasElement) {
-            this.textureImage = imageOrBuffer;
-        } else if (typeof imageOrBuffer === 'string') {
-            this.textureImage = this.textureCache[imageOrBuffer];
-        } else if (imageOrBuffer instanceof HTMLImageElement) {
-            this.textureImage = imageOrBuffer;
-        }
-        this.fillStyle = null;
-    }
-
-    image(img, x, y, width, height = width, mode = 'cover') {
-        this.setTexture(img, mode);
-        this.rect(x, y, width, height);
-    }
-
-    beginShape() {
-        this.currentShape = [];
-    }
-
-    endShape(close = true) {
-        if (!this.currentShape) return;
-        const ctx = this.context;
-
-        ctx.beginPath();
-        if (this.borderRadii.length > 0) {
-            this._drawPathWithBorderRadius(ctx, this.currentShape, close);
-        } else {
-            this._drawPath(ctx, this.currentShape, close);
-        }
-
-        if (this.textureImage) {
-            const boundingBox = this._getBoundingBox(this.currentShape);
-            const cacheKey = `${this.textureImage.src || this.randomGenerator.random()}-${boundingBox.width}-${boundingBox.height}-${this.textureMode}`;
-
-            if (!this.scaledTextureCache[cacheKey]) {
-                this.scaledTextureCache[cacheKey] = this._createScaledTexture(this.textureImage, this.textureMode, boundingBox);
             }
 
-            ctx.save();
-            ctx.clip();
-            ctx.drawImage(this.scaledTextureCache[cacheKey], boundingBox.x, boundingBox.y, boundingBox.width, boundingBox.height);
-            ctx.restore();
-        } else if (this.fillStyle && !this.eraseMode) {
-            ctx.fillStyle = this.fillStyle;
-            ctx.fill();
-        } else if (this.eraseMode) {
-            ctx.fillStyle = `rgba(0, 0, 0, ${this.eraseFillStrength / 255})`;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
+            $.context.fill();
+            $.context.stroke();
+            currentShapeVertices = [];
+            currentShapeMode = '';
         }
+        // $.borderRadii = [];
+    };
 
-        if (this.strokeStyle && !this.eraseMode) {
-            ctx.strokeStyle = this.strokeStyle;
-            ctx.lineWidth = this.strokeWidth;
-            ctx.stroke();
-        } else if (this.eraseMode) {
-            ctx.strokeStyle = `rgba(0, 0, 0, ${this.eraseStrokeStrength / 255})`;
-            ctx.lineWidth = this.strokeWidth;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.stroke();
-            ctx.globalCompositeOperation = 'source-over';
-        }
-
-        this.currentShape = null;
-    }
-
-    viewBuffer(buffer, x = 0, y = 0) {
-        if (buffer && buffer.buffer) {
-            this.context.drawImage(buffer.buffer, this._scaleCoordinate(x), this._scaleCoordinate(y));
-        }
-    }
-
-    hideBuffer() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this._drawBackground();
-    }
-
-    _drawPath(ctx, vertices, close) {
-        if (vertices.length < 2) return;
-
-        ctx.moveTo(vertices[0].x, vertices[0].y);
-        for (let i = 1, len = vertices.length; i < len; i++) {
-            ctx.lineTo(vertices[i].x, vertices[i].y);
-        }
-        if (close) {
-            ctx.closePath();
-        }
-    }
-
-    _drawPathWithBorderRadius(ctx, vertices, close) {
+    function _drawPathWithBorderRadius(ctx, vertices, close) {
         if (vertices.length < 2) return;
 
         const firstVertex = vertices[0];
         const lastVertex = vertices[vertices.length - 1];
 
-        if (close && this.borderRadii.length > 0) {
-            const radius = this._getBorderRadius(0);
-            const prevLine = this._calculateLine(lastVertex, firstVertex, radius);
+        if (close && $.borderRadii.length > 0) {
+            const radius = _getBorderRadius(0);
+            const prevLine = _calculateLine(lastVertex, firstVertex, radius);
             ctx.moveTo(prevLine.x1, prevLine.y1);
         } else {
             ctx.moveTo(firstVertex.x, firstVertex.y);
@@ -560,10 +1323,10 @@ class T5Canvas {
             const nextVertex = vertices[(i + 1) % len];
             const prevVertex = vertices[(i - 1 + len) % len];
 
-            const radius = this._getBorderRadius(i);
+            const radius = _getBorderRadius(i);
             if (radius > 0) {
-                const prevLine = this._calculateLine(prevVertex, currVertex, radius);
-                const nextLine = this._calculateLine(currVertex, nextVertex, radius);
+                const prevLine = _calculateLine(prevVertex, currVertex, radius);
+                const nextLine = _calculateLine(currVertex, nextVertex, radius);
 
                 if (i > 0) {
                     ctx.lineTo(prevLine.x1, prevLine.y1);
@@ -580,7 +1343,7 @@ class T5Canvas {
         }
     }
 
-    _calculateLine(p0, p1, radius) {
+    function _calculateLine(p0, p1, radius) {
         const dx = p1.x - p0.x;
         const dy = p1.y - p0.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -595,1528 +1358,993 @@ class T5Canvas {
         };
     }
 
-    _getBorderRadius(index) {
-        if (this.borderRadii.length === 0) return 0;
-        let radius = this.borderRadii[Math.min(index, this.borderRadii.length - 1)];
-        return this._scaleCoordinate(radius);
+    function _getBorderRadius(index) {
+        if ($.borderRadii.length === 0) return 0;
+        let radius = $.borderRadii[Math.min(index, $.borderRadii.length - 1)];
+        [radius] = $.scaleT5Coords([radius]);
+        return radius;
     }
 
-    _createScaledTexture(image, mode, boundingBox) {
-        const { width, height } = boundingBox;
-        const patternCanvas = document.createElement('canvas');
-        const patternContext = patternCanvas.getContext('2d');
-        patternCanvas.width = width;
-        patternCanvas.height = height;
 
-        patternContext.clearRect(0, 0, width, height);
-        if (!this.smooth) {
-            patternContext.imageSmoothingEnabled = false;
+    $.arc = function (x, y, radius, startAngle, endAngle, counterclockwise = false) {
+        [x, y, radius] = $.scaleT5Coords([x, y, radius]);
+        if ($.context) {
+            $.context.beginPath();
+            $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
+            $.context.fill();
+            $.context.stroke();
         }
-        if (mode === 'cover') {
-            patternContext.drawImage(image, 0, 0, width, height);
-        } else if (mode === 'contain') {
-            const scale = Math.min(width / image.width, height / image.height);
-            const offsetX = (width - image.width * scale) / 2;
-            const offsetY = (height - image.height * scale) / 2;
-            patternContext.drawImage(image, offsetX, offsetY, image.width * scale, image.height * scale);
+    };
+
+    $.point = function (x, y) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        if ($.context) {
+            $.context.save();
+            $.context.beginPath();
+            $.context.arc(x, y, $.context.lineWidth / 2, 0, Math.PI * 2);
+            $.context.fillStyle = $.context.strokeStyle;
+            $.context.fill();
+            $.context.restore();
         }
+    };
 
-        return patternCanvas;
-    }
-
-    _getBoundingBox(vertices) {
-        const xs = vertices.map(v => v.x);
-        const ys = vertices.map(v => v.y);
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-        return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
-    }
-
-    noise(x, y = 0, z = 0) {
-        return this.noiseGenerator.noise(x, y, z);
-    }
-
-    random(min, max) {
-        return this.randomGenerator.random(min, max);
-    }
-
-    randomSeed(seed) {
-        this.randomGenerator = new PRNG(seed);
-    }
-
-    noiseSeed(seed) {
-        this.noiseGenerator = new Noise(seed);
-    }
-
-    push() {
-        const ctx = this.context;
-        ctx.save();
-        this.matrixStack.push({
-            fillStyle: this.fillStyle,
-            strokeStyle: this.strokeStyle,
-            strokeWidth: this.strokeWidth,
-            strokeType: this.strokeType,
-            borderRadii: [...this.borderRadii],
-            backgroundColor: this.backgroundColor,
-            currentShape: this.currentShape,
-            textureImage: this.textureImage,
-            textureMode: this.textureMode,
-        });
-    }
-
-    pop() {
-        const ctx = this.context;
-        ctx.restore();
-        const state = this.matrixStack.pop();
-        if (state) {
-            this.fillStyle = state.fillStyle;
-            this.strokeStyle = state.strokeStyle;
-            this.strokeWidth = state.strokeWidth;
-            this.strokeType = state.strokeType;
-            this.borderRadii = state.borderRadii;
-            this.backgroundColor = state.backgroundColor;
-            this.currentShape = state.currentShape;
-            this.textureImage = state.textureImage;
-            this.textureMode = state.textureMode;
+    $.fillText = function (text, x, y) {
+        [text, x, y] = $.scaleT5Coords([text, x, y]);
+        if ($.context) {
+            $.context.fillText(text, x, y);
         }
-    }
+    };
 
-    applyMatrix(a, b, c, d, e, f) {
-        this.context.transform(a, b, c, d, e, f);
-    }
+    $.clear = function () {
+        $.context.clearRect(0, 0, $.canvas.width, $.canvas.height);
+    };
 
-    resetMatrix() {
-        this.context.setTransform(1, 0, 0, 1, 0, 0);
-    }
-
-    translate(x, y) {
-        this.context.translate(this._scaleCoordinate(x), this._scaleCoordinate(y));
-    }
-
-    rotate(angle) {
-        this.context.rotate(angle);
-    }
-
-    scale(sx, sy = sx) {
-        this.context.scale(sx, sy);
-    }
-
-    shearX(angle) {
-        this.context.transform(1, 0, Math.tan(angle), 1, 0, 0);
-    }
-
-    shearY(angle) {
-        this.context.transform(1, Math.tan(angle), 0, 1, 0, 0);
-    }
-
-    _drawBackground() {
-        if (this.backgroundSet) {
-            this.context.fillStyle = this.backgroundColor;
-            this.context.fillRect(0, 0, this.context.canvas.width, this.context.canvas.height);
+    $.bezier = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
+        if ($.context) {
+            $.context.beginPath();
+            $.context.moveTo(x1, y1);
+            $.context.bezierCurveTo(x2, y2, x3, y3, x4, y4);
+            $.context.stroke();
         }
-    }
+    };
+    $.bezierCurve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
+        if ($.context) {
+            let cp1x = x2 + (x3 - x1) / 6;
+            let cp1y = y2 + (y3 - y1) / 6;
+            let cp2x = x3 - (x4 - x2) / 6;
+            let cp2y = y3 - (y4 - y2) / 6;
 
-    vertex(x, y) {
-        if (this.currentShape) {
-            this.currentShape.push({ x: this._scaleCoordinate(x), y: this._scaleCoordinate(y) });
+            $.context.beginPath();
+            $.context.moveTo(x2, y2);
+            $.context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x3, y3);
+            $.context.stroke();
         }
-    }
+    };
+    $.curve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
+        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
+        if ($.context) {
+            let cp1x = x2 + (x3 - x1) / 6;
+            let cp1y = y2 + (y3 - y1) / 6;
+            let cp2x = x3 - (x4 - x2) / 6;
+            let cp2y = y3 - (y4 - y2) / 6;
 
-    point(x, y) {
-        const ctx = this.context;
-        ctx.beginPath();
-        ctx.arc(this._scaleCoordinate(x), this._scaleCoordinate(y), this.strokeWidth / 2, 0, Math.PI * 2);
-        ctx.fillStyle = this.strokeStyle;
-        ctx.fill();
-    }
-
-    ellipse(x, y, width, height = width) {
-        const ctx = this.context;
-        ctx.beginPath();
-        ctx.ellipse(
-            this._scaleCoordinate(x),
-            this._scaleCoordinate(y),
-            (this._scaleCoordinate(width) / 2),
-            (this._scaleCoordinate(height) / 2),
-            0, 0, Math.PI * 2
-        );
-
-        if (this.textureImage) {
-            const cacheKey = `${this.textureImage.src || this.randomGenerator.random()}-${width}-${height}-${this.textureMode}`;
-            if (!this.scaledTextureCache[cacheKey]) {
-                const patternCanvas = document.createElement('canvas');
-                patternCanvas.width = this._scaleCoordinate(width);
-                patternCanvas.height = this._scaleCoordinate(height);
-                const patternContext = patternCanvas.getContext('2d');
-                patternContext.clearRect(0, 0, this._scaleCoordinate(width), this._scaleCoordinate(height));
-
-                if (this.textureMode === 'cover') {
-                    patternContext.drawImage(this.textureImage, 0, 0, this._scaleCoordinate(width), this._scaleCoordinate(height));
-                } else if (this.textureMode === 'contain') {
-                    const scale = Math.min(this._scaleCoordinate(width) / this.textureImage.width, this._scaleCoordinate(height) / this.textureImage.height);
-                    const offsetX = (this._scaleCoordinate(width) - this.textureImage.width * scale) / 2;
-                    const offsetY = (this._scaleCoordinate(height) - this.textureImage.height * scale) / 2;
-                    patternContext.drawImage(this.textureImage, offsetX, offsetY, this.textureImage.width * scale, this.textureImage.height * scale);
-                }
-                this.scaledTextureCache[cacheKey] = patternCanvas;
-            }
-
-            ctx.save();
-            ctx.clip();
-            ctx.drawImage(this.scaledTextureCache[cacheKey], this._scaleCoordinate(x) - (this._scaleCoordinate(width) / 2), this._scaleCoordinate(y) - (this._scaleCoordinate(height) / 2), this._scaleCoordinate(width), this._scaleCoordinate(height));
-            ctx.restore();
-        } else if (this.fillStyle && !this.eraseMode) {
-            ctx.fillStyle = this.fillStyle;
-            ctx.fill();
-        } else if (this.eraseMode) {
-            ctx.fillStyle = `rgba(0, 0, 0, ${this.eraseFillStrength / 255})`;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.fill();
-            ctx.globalCompositeOperation = 'source-over';
+            $.context.beginPath();
+            $.context.moveTo(x2, y2);
+            $.context.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, x3, y3);
+            $.context.stroke();
         }
+    };
+};
 
-        if (this.strokeStyle && !this.eraseMode) {
-            ctx.strokeStyle = this.strokeStyle;
-            ctx.lineWidth = this.strokeWidth;
-            ctx.stroke();
-        } else if (this.eraseMode) {
-            ctx.strokeStyle = `rgba(0, 0, 0, ${this.eraseStrokeStrength / 255})`;
-            ctx.lineWidth = this.strokeWidth;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.stroke();
-            ctx.globalCompositeOperation = 'source-over';
-        }
+T5.addOns.draw(T5.prototype, T5.prototype);
+//************************************************************************//
+//********************************-T5Math-********************************//
+//************************************************************************//
+T5.addOns.math = ($, p) => {
+    // Constants
+    $.defineConstant('PI', Math.PI);
+    $.defineConstant('TWO_PI', Math.PI * 2);
+    $.defineConstant('TAU', Math.PI * 2);
+    $.defineConstant('HALF_PI', Math.PI / 2);
+    $.defineConstant('QUARTER_PI', Math.PI / 4);
+    $.defineConstant('E', Math.E);
+    $.defineConstant('SIMPLEX', 'simplex');
+    $.defineConstant('PERLIN', 'perlin');
+    // Trigonometric Functions
+    $.sin = Math.sin;
+    $.cos = Math.cos;
+    $.tan = Math.tan;
+    $.asin = Math.asin;
+    $.acos = Math.acos;
+    $.atan = Math.atan;
+    $.atan2 = Math.atan2;
+
+    // Rounding Functions
+    $.floor = Math.floor;
+    $.ceil = Math.ceil;
+    $.round = Math.round;
+
+    // Exponential and Logarithmic Functions
+    $.exp = Math.exp;
+    $.log = Math.log;
+    $.pow = Math.pow;
+    $.sqrt = Math.sqrt;
+    $.sq = (x) => x * x;
+
+    // Utility Functions
+    $.abs = Math.abs;
+    $.max = Math.max;
+    $.min = Math.min;
+    $.mag = Math.hypot;
+    $.constrain = (n, low, high) => Math.max(Math.min(n, high), low);
+    $.degrees = (radians) => radians * (180 / Math.PI);
+    $.radians = (degrees) => degrees * (Math.PI / 180);
+    $.map = (value, start1, stop1, start2, stop2) => start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));
+    $.lerp = (start, stop, amt) => start + (stop - start) * amt;
+    $.int = (n) => n < 0 ? Math.ceil(n) : Math.floor(n);
+    $.dist = (x1, y1, x2, y2) => {
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // Pseudo-Random Number Generator (PRNG)
+    let randomSeedValue = Math.floor(Math.random() * 123456789)
+    let noiseSeedValue = Math.floor(Math.random() * 123456789)
+
+
+    function seededRandom() {
+        const x = Math.sin(randomSeedValue++) * 10000;
+        return x - Math.floor(x);
     }
 
-    rect(x, y, width, height = width) {
-        const ctx = this.context;
-        const scaledX = this._scaleCoordinate(x);
-        const scaledY = this._scaleCoordinate(y);
-        const scaledWidth = this._scaleCoordinate(width);
-        const scaledHeight = this._scaleCoordinate(height);
+    $.randomSeed = function (seed) {
+        randomSeedValue = seed;
+    };
 
-        if (this.borderRadii.length === 0 || (this.borderRadii.length === 1 && this.borderRadii[0] === 0)) {
-            if (this.textureImage) {
-                const cacheKey = `${this.textureImage.src || this.randomGenerator.random()}-${width}-${height}-${this.textureMode}`;
-                if (!this.scaledTextureCache[cacheKey]) {
-                    this.scaledTextureCache[cacheKey] = this._createScaledTexture(this.textureImage, this.textureMode, { x: scaledX, y: scaledY, width: scaledWidth, height: scaledHeight });
-                }
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(scaledX, scaledY, scaledWidth, scaledHeight);
-                ctx.clip();
-                ctx.drawImage(this.scaledTextureCache[cacheKey], scaledX, scaledY, scaledWidth, scaledHeight);
-                ctx.restore();
-            } else if (this.fillStyle && !this.eraseMode) {
-                ctx.fillStyle = this.fillStyle;
-                ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
-            } else if (this.eraseMode) {
-                ctx.fillStyle = `rgba(0, 0, 0, ${this.eraseFillStrength / 255})`;
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.fillRect(scaledX, scaledY, scaledWidth, scaledHeight);
-                ctx.globalCompositeOperation = 'source-over';
-            }
-
-            if (this.strokeStyle && !this.eraseMode) {
-                ctx.strokeStyle = this.strokeStyle;
-                ctx.lineWidth = this.strokeWidth;
-                ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
-            } else if (this.eraseMode) {
-                ctx.strokeStyle = `rgba(0, 0, 0, ${this.eraseStrokeStrength / 255})`;
-                ctx.lineWidth = this.strokeWidth;
-                ctx.globalCompositeOperation = 'destination-out';
-                ctx.strokeRect(scaledX, scaledY, scaledWidth, scaledHeight);
-                ctx.globalCompositeOperation = 'source-over';
-            }
+    $.random = function (min, max) {
+        if (Array.isArray(min)) {
+            const index = Math.floor(seededRandom() * min.length);
+            return min[index];
+        } else if (typeof min === 'undefined') {
+            return seededRandom();
+        } else if (typeof max === 'undefined') {
+            return seededRandom() * min;
         } else {
-            this.beginShape();
-            this.vertex(x, y);
-            this.vertex(x + width, y);
-            this.vertex(x + width, y + height);
-            this.vertex(x, y + height);
-            this.endShape(true);
+            return seededRandom() * (max - min) + min;
         }
-    }
+    };
 
-    _scaleCoordinate(coord) {
-        if (this.dimensionAgnosticMode) {
-            return (coord / this.dimensionUnit) * this.canvas.width;
-        }
-        return coord * this.pixelDensityValue;
-    }
-
-    line(x, y, x2, y2) {
-        this.beginShape();
-        this.vertex(x, y);
-        this.vertex(x2, y2);
-        this.endShape(false);
-    }
-
-    quad(x1, y1, x2, y2, x3, y3, x4, y4) {
-        this.beginShape();
-        this.vertex(x1, y1);
-        this.vertex(x2, y2);
-        this.vertex(x3, y3);
-        this.vertex(x4, y4);
-        this.endShape(true);
-    }
-
-    triangle(x1, y1, x2, y2, x3, y3) {
-        this.beginShape();
-        this.vertex(x1, y1);
-        this.vertex(x2, y2);
-        this.vertex(x3, y3);
-        this.endShape(true);
-    }
-
-    polygon(x, y, radius, verts) {
-        const angleIncrement = (2 * Math.PI) / verts;
-        this.beginShape();
-        for (let i = 0; i < verts; i++) {
-            const angle = i * angleIncrement;
-            const vx = x + Math.cos(angle) * radius;
-            const vy = y + Math.sin(angle) * radius;
-            this.vertex(vx, vy);
-        }
-        this.endShape(true);
-    }
-
-    erase(fillStrength = 255, strokeStrength = 255) {
-        this.eraseMode = true;
-        this.eraseFillStrength = fillStrength;
-        this.eraseStrokeStrength = strokeStrength;
-    }
-
-    noErase() {
-        this.eraseMode = false;
-    }
-
-    clear() {
-        const ctx = this.context;
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-
-    _processColorArgs(args) {
-        if (args.length === 1 && typeof args[0] === 'string') {
-            return args[0];
-        } else if (args.length === 1 && typeof args[0] === 'number') {
-            return `rgba(${args[0]},${args[0]},${args[0]},1)`;
-        } else if (args.length === 2) {
-            return `rgba(${args[0]},${args[0]},${args[0]},${args[1] / 255})`;
-        } else if (args.length === 3) {
-            return `rgba(${args[0]},${args[1]},${args[2]},1)`;
-        } else if (args.length === 4) {
-            return `rgba(${args[0]},${args[1]},${args[2]},${args[3] / 255})`;
-        } else {
-            throw new Error('Invalid color format');
-        }
-    }
-    fillArea(x, y, ...colorArgs) {
-        x = Math.floor(this._scaleCoordinate(x));
-        y = Math.floor(this._scaleCoordinate(y));
-
-        const fillColor = this._processColorArgs(colorArgs);
-        const imageData = this.context.getImageData(0, 0, this.canvas.width, this.canvas.height);
-
-        const data = imageData.data;
-        const width = this.canvas.width;
-        const height = this.canvas.height;
-
-        const targetColor = this.getColorAt(x, y, data, width);
-        const fillRgb = this.colorToRgba(fillColor);
-
-        const stack = [[x, y]];
-        const visited = new Uint8Array(width * height);
-        const key = (x, y) => y * width + x;
-
-        while (stack.length > 0) {
-            const [currX, currY] = stack.pop();
-            let startX = currX;
-            let endX = currX;
-
-            while (startX >= 0 && this.colorsMatch(this.getColorAt(startX, currY, data, width), targetColor)) {
-                startX--;
+    $.randomGaussian = (() => {
+        let y2;
+        let useLast = false;
+        return () => {
+            let y1, x1, x2, w;
+            if (useLast) {
+                y1 = y2;
+                useLast = false;
+            } else {
+                do {
+                    x1 = seededRandom() * 2 - 1;
+                    x2 = seededRandom() * 2 - 1;
+                    w = x1 * x1 + x2 * x2;
+                } while (w >= 1);
+                w = Math.sqrt((-2 * Math.log(w)) / w);
+                y1 = x1 * w;
+                y2 = x2 * w;
+                useLast = true;
             }
-            startX++;
+            return y1;
+        };
+    })();
 
-            while (endX < width && this.colorsMatch(this.getColorAt(endX, currY, data, width), targetColor)) {
-                endX++;
+    class Noise {
+        constructor() {
+            this.octaves = 1;
+            this.falloff = 0.5;
+        }
+
+        setDetail(lod, falloff) {
+            this.octaves = lod;
+            this.falloff = falloff;
+        }
+    }
+
+    // Perlin Noise
+    class PerlinNoise extends Noise {
+        constructor(seed) {
+            super();
+            this.grad3 = [
+                [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
+                [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+                [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
+            ];
+            this.seed(seed || noiseSeedValue);
+        }
+
+        seed(seed) {
+            this.p = this.buildPermutationTable(seed === undefined ? noiseSeedValue : seed);
+            this.perm = this.p.concat(this.p);
+        }
+
+        buildPermutationTable(seed) {
+            const p = [];
+            for (let i = 0; i < 256; i++) {
+                p[i] = i;
             }
-            endX--;
 
-            for (let i = startX; i <= endX; i++) {
-                if (!visited[key(i, currY)]) {
-                    this.setColorAt(i, currY, fillRgb, data, width);
-                    visited[key(i, currY)] = 1;
+            let n, q;
+            for (let i = 255; i > 0; i--) {
+                seed = (seed * 16807) % 2147483647;
+                n = seed % (i + 1);
+                q = p[i];
+                p[i] = p[n];
+                p[n] = q;
+            }
 
-                    if (currY + 1 < height && !visited[key(i, currY + 1)] && this.colorsMatch(this.getColorAt(i, currY + 1, data, width), targetColor)) {
-                        stack.push([i, currY + 1]);
+            return p;
+        }
+
+        dot(g, x, y, z) {
+            return g[0] * x + g[1] * y + g[2] * z;
+        }
+
+        fade(t) {
+            return t * t * t * (t * (t * 6 - 15) + 10);
+        }
+
+        noise(x, y, z = 0) {
+            let total = 0;
+            let freq = 1;
+            let amp = 1;
+            let maxAmp = 0;
+
+            for (let i = 0; i < this.octaves; i++) {
+                const X = Math.floor(x * freq) & 255;
+                const Y = Math.floor(y * freq) & 255;
+                const Z = Math.floor(z * freq) & 255;
+
+                const xf = x * freq - Math.floor(x * freq);
+                const yf = y * freq - Math.floor(y * freq);
+                const zf = z * freq - Math.floor(z * freq);
+
+                const u = this.fade(xf);
+                const v = this.fade(yf);
+                const w = this.fade(zf);
+
+                const A = this.perm[X] + Y;
+                const AA = this.perm[A] + Z;
+                const AB = this.perm[A + 1] + Z;
+                const B = this.perm[X + 1] + Y;
+                const BA = this.perm[B] + Z;
+                const BB = this.perm[B + 1] + Z;
+
+                const gradAA = this.grad3[this.perm[AA] % 12];
+                const gradBA = this.grad3[this.perm[BA] % 12];
+                const gradAB = this.grad3[this.perm[AB] % 12];
+                const gradBB = this.grad3[this.perm[BB] % 12];
+                const gradAA1 = this.grad3[this.perm[AA + 1] % 12];
+                const gradBA1 = this.grad3[this.perm[BA + 1] % 12];
+                const gradAB1 = this.grad3[this.perm[AB + 1] % 12];
+                const gradBB1 = this.grad3[this.perm[BB + 1] % 12];
+
+                const lerp1 = this.mix(this.dot(gradAA, xf, yf, zf), this.dot(gradBA, xf - 1, yf, zf), u);
+                const lerp2 = this.mix(this.dot(gradAB, xf, yf - 1, zf), this.dot(gradBB, xf - 1, yf - 1, zf), u);
+                const lerp3 = this.mix(this.dot(gradAA1, xf, yf, zf - 1), this.dot(gradBA1, xf - 1, yf, zf - 1), u);
+                const lerp4 = this.mix(this.dot(gradAB1, xf, yf - 1, zf - 1), this.dot(gradBB1, xf - 1, yf - 1, zf - 1), u);
+
+                const mix1 = this.mix(lerp1, lerp2, v);
+                const mix2 = this.mix(lerp3, lerp4, v);
+
+                total += this.mix(mix1, mix2, w) * amp;
+
+                maxAmp += amp;
+                amp *= this.falloff;
+                freq *= 2;
+            }
+
+            return (total / maxAmp + 1) / 2;
+        }
+
+        mix(a, b, t) {
+            return (1 - t) * a + t * b;
+        }
+    }
+
+    // Simplex Noise
+    class SimplexNoise extends Noise {
+        constructor(seed) {
+            super();
+            this.grad3 = [
+                [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
+                [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+                [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
+            ];
+            this.F3 = 1.0 / 3.0;
+            this.G3 = 1.0 / 6.0;
+            this.seed(seed || noiseSeedValue);
+        }
+
+        seed(seed) {
+            this.p = this.buildPermutationTable(seed === undefined ? noiseSeedValue : seed);
+            this.perm = this.p.concat(this.p); // Extend the permutation table
+        }
+
+        buildPermutationTable(seed) {
+            const p = [];
+            for (let i = 0; i < 256; i++) {
+                p[i] = i;
+            }
+
+            let n, q;
+            for (let i = 255; i > 0; i--) {
+                seed = (seed * 16807) % 2147483647;
+                n = seed % (i + 1);
+                q = p[i];
+                p[i] = p[n];
+                p[n] = q;
+            }
+
+            return p;
+        }
+
+        dot(g, x, y, z) {
+            return g[0] * x + g[1] * y + g[2] * z;
+        }
+
+        noise(xin, yin, zin) {
+            let total = 0;
+            let freq = 1;
+            let amp = 1;
+            let maxAmp = 0;
+
+            for (let i = 0; i < this.octaves; i++) {
+                let n0, n1, n2, n3;
+                let s = (xin * freq + yin * freq + zin * freq) * this.F3;
+                let i = Math.floor(xin * freq + s);
+                let j = Math.floor(yin * freq + s);
+                let k = Math.floor(zin * freq + s);
+                let t = (i + j + k) * this.G3;
+                let X0 = i - t;
+                let Y0 = j - t;
+                let Z0 = k - t;
+                let x0 = xin * freq - X0;
+                let y0 = yin * freq - Y0;
+                let z0 = zin * freq - Z0;
+
+                let i1, j1, k1;
+                let i2, j2, k2;
+
+                if (x0 >= y0) {
+                    if (y0 >= z0) {
+                        i1 = 1;
+                        j1 = 0;
+                        k1 = 0;
+                        i2 = 1;
+                        j2 = 1;
+                        k2 = 0;
+                    } else if (x0 >= z0) {
+                        i1 = 1;
+                        j1 = 0;
+                        k1 = 0;
+                        i2 = 1;
+                        j2 = 0;
+                        k2 = 1;
+                    } else {
+                        i1 = 0;
+                        j1 = 0;
+                        k1 = 1;
+                        i2 = 1;
+                        j2 = 0;
+                        k2 = 1;
                     }
-                    if (currY - 1 >= 0 && !visited[key(i, currY - 1)] && this.colorsMatch(this.getColorAt(i, currY - 1, data, width), targetColor)) {
-                        stack.push([i, currY - 1]);
+                } else {
+                    if (y0 < z0) {
+                        i1 = 0;
+                        j1 = 0;
+                        k1 = 1;
+                        i2 = 0;
+                        j2 = 1;
+                        k2 = 1;
+                    } else if (x0 < z0) {
+                        i1 = 0;
+                        j1 = 1;
+                        k1 = 0;
+                        i2 = 0;
+                        j2 = 1;
+                        k2 = 1;
+                    } else {
+                        i1 = 0;
+                        j1 = 1;
+                        k1 = 0;
+                        i2 = 1;
+                        j2 = 1;
+                        k2 = 0;
                     }
+                }
+
+                let x1 = x0 - i1 + this.G3;
+                let y1 = y0 - j1 + this.G3;
+                let z1 = z0 - k1 + this.G3;
+                let x2 = x0 - i2 + 2.0 * this.G3;
+                let y2 = y0 - j2 + 2.0 * this.G3;
+                let z2 = z0 - k2 + 2.0 * this.G3;
+                let x3 = x0 - 1.0 + 3.0 * this.G3;
+                let y3 = y0 - 1.0 + 3.0 * this.G3;
+                let z3 = z0 - 1.0 + 3.0 * this.G3;
+
+                let ii = i & 255;
+                let jj = j & 255;
+                let kk = k & 255;
+
+                let gi0 = this.perm[ii + this.perm[jj + this.perm[kk]]] % 12;
+                let gi1 = this.perm[ii + i1 + this.perm[jj + j1 + this.perm[kk + k1]]] % 12;
+                let gi2 = this.perm[ii + i2 + this.perm[jj + j2 + this.perm[kk + k2]]] % 12;
+                let gi3 = this.perm[ii + 1 + this.perm[jj + 1 + this.perm[kk + 1]]] % 12;
+
+                let t0 = 0.5 - x0 * x0 - y0 * y0 - z0 * z0;
+                if (t0 < 0) n0 = 0.0;
+                else {
+                    t0 *= t0;
+                    n0 = t0 * t0 * this.dot(this.grad3[gi0], x0, y0, z0);
+                }
+
+                let t1 = 0.5 - x1 * x1 - y1 * y1 - z1 * z1;
+                if (t1 < 0) n1 = 0.0;
+                else {
+                    t1 *= t1;
+                    n1 = t1 * t1 * this.dot(this.grad3[gi1], x1, y1, z1);
+                }
+
+                let t2 = 0.5 - x2 * x2 - y2 * y2 - z2 * z2;
+                if (t2 < 0) n2 = 0.0;
+                else {
+                    t2 *= t2;
+                    n2 = t2 * t2 * this.dot(this.grad3[gi2], x2, y2, z2);
+                }
+
+                let t3 = 0.5 - x3 * x3 - y3 * y3 - z3 * z3;
+                if (t3 < 0) n3 = 0.0;
+                else {
+                    t3 *= t3;
+                    n3 = t3 * t3 * this.dot(this.grad3[gi3], x3, y3, z3);
+                }
+
+                total += 32.0 * (n0 + n1 + n2 + n3) * amp;
+
+                maxAmp += amp;
+                amp *= this.falloff;
+                freq *= 2;
+            }
+
+            return (total / maxAmp + 1) / 2;
+        }
+    }
+
+    // Initialize the noise generator with a random seed value
+    let noiseGenerator;
+    let noiseMode = "perlin";
+
+    function initNoiseGenerator() {
+        if (noiseMode === "simplex") {
+            noiseGenerator = new SimplexNoise(noiseSeedValue);
+        } else {
+            noiseGenerator = new PerlinNoise(noiseSeedValue);
+        }
+    }
+
+    $.noiseSeed = function (seed) {
+        noiseSeedValue = seed;
+        initNoiseGenerator();
+    };
+
+    $.noiseDetail = function (lod, falloff) {
+        noiseGenerator.setDetail(lod, falloff);
+    };
+
+    $.noiseMode = function (mode) {
+        noiseMode = mode;
+        initNoiseGenerator();
+    };
+
+    $.noise = function (x, y = 0, z = 0) {
+        return noiseGenerator.noise(x, y, z);
+    };
+
+    // Angle Modes
+    $.defineConstant('DEGREES', 'degrees');
+    $.defineConstant('RADIANS', 'radians');
+
+    $.DEGREES = 'degrees';
+    $.RADIANS = 'radians';
+    $.angleMode = $.RADIANS;
+
+    // Angle Conversion
+    $.toRadians = (angle) => $.angleMode === DEGREES ? angle * (Math.PI / 180) : angle;
+    $.toDegrees = (angle) => $.angleMode === RADIANS ? angle * (180 / Math.PI) : angle;
+    $.noiseSeed(noiseSeedValue);
+    $.randomSeed(randomSeedValue);
+    initNoiseGenerator();
+};
+
+T5.addOns.math(T5.prototype, T5.prototype);
+//************************************************************************//
+//********************************-T5Text-********************************//
+//************************************************************************//
+T5.addOns.text = ($, p) => {
+    // Constants
+    $.defineConstant('NORMAL', 'normal');
+    $.defineConstant('ITALIC', 'italic');
+    $.defineConstant('BOLD', 'bold');
+    $.defineConstant('BOLDITALIC', 'italic bold');
+    $.defineConstant('CENTER', 'center');
+    $.defineConstant('MIDDLE', 'middle');
+    $.defineConstant('LEFT', 'left');
+    $.defineConstant('RIGHT', 'right');
+    $.defineConstant('TOP', 'top');
+    $.defineConstant('BOTTOM', 'bottom');
+    $.defineConstant('BASELINE', 'alphabetic');
+    $.defineConstant('WORD', 'word');
+    $.defineConstant('CHAR', 'char');
+    $.defineConstant('WRAP', 'wrap');
+    $.defineConstant('NOWRAP', 'nowrap');
+
+    // Default text properties
+    $.textSizeVal = 12;
+    $.textAlignH = 'left';
+    $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
+    $.textLeadingVal = $.textSizeVal * 1.2;
+    $.textFontVal = 'sans-serif';
+    $.textStyleVal = 'normal';
+    $.textWrapVal = 'wrap';
+    $.textFillColor = '#000000';
+    $.textStrokeColor = '#000000';
+
+    // Set text size
+    $.textSize = function (size) {
+        [size] = $.scaleT5Coords([size]);
+        if (size !== undefined) {
+            $.textSizeVal = size;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        }
+        return $.textSizeVal;
+    };
+
+    // Set text font
+    $.textFont = function (font) {
+        if (font !== undefined) {
+            $.textFontVal = font;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        }
+        return $.textFontVal;
+    };
+
+    // Set text style (normal, bold, italic)
+    $.textStyle = function (style) {
+        if (style !== undefined) {
+            $.textStyleVal = style;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        }
+        return $.textStyleVal;
+    };
+
+    // Set text alignment
+    $.textAlign = function (hAlign, vAlign) {
+        // if (vAlign == CENTER) {
+        //   vAlign = 'middle';
+        // }
+        if (hAlign !== undefined) {
+            $.textAlignH = hAlign;
+        }
+        if (vAlign !== undefined) {
+            $.textAlignV = vAlign;
+        }
+        $.context.textAlign = $.textAlignH;
+        $.context.textBaseline = $.textAlignV;
+    };
+
+    // Set text leading (line height)
+    $.textLeading = function (leading) {
+        [leading] = $.scaleT5Coords([leading]);
+        if (leading !== undefined) {
+            $.textLeadingVal = leading;
+        }
+        return $.textLeadingVal;
+    };
+
+    // Set text wrap
+    $.textWrap = function (wrapType) {
+        if (wrapType !== undefined) {
+            $.textWrapVal = wrapType;
+        }
+        return $.textWrapVal;
+    };
+
+    // Measure text width
+    $.textWidth = function (str) {
+        return $.context.measureText(str).width;
+    };
+
+    // Measure text ascent
+    $.textAscent = function () {
+        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        return $.context.measureText("M").actualBoundingBoxAscent;
+    };
+
+    // Measure text descent
+    $.textDescent = function () {
+        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        return $.context.measureText("g").actualBoundingBoxDescent;
+    };
+
+    // Draw text
+    $.text = function (str, x, y, maxWidth) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        const lines = str.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+            } else {
+                if ($.context.fillStyle) {
+                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
+                }
+                if ($.context.strokeStyle) {
+                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
                 }
             }
         }
+    };
 
-        this.context.putImageData(imageData, 0, 0);
-    }
-
-    getColorAt(x, y, data, width) {
-        const index = (y * width + x) * 4;
-        return [data[index], data[index + 1], data[index + 2], data[index + 3]];
-    }
-
-    setColorAt(x, y, color, data, width) {
-        const index = (y * width + x) * 4;
-        data[index] = color[0];
-        data[index + 1] = color[1];
-        data[index + 2] = color[2];
-        data[index + 3] = color[3];
-    }
-
-    colorsMatch(a, b) {
-        return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
-    }
-
-    colorToRgba(color) {
-        const components = getColorComponents(color);
-        return [components.r, components.g, components.b, components.a];
-    }
-}
-function windowResized() { }
-// T5 instance
-const myT5 = new T5Canvas();
-myT5.strokeWidth = myT5._scaleCoordinate(myT5.strokeWidth);
-const registerWindowResized = (callback) => myT5.windowResized(callback);
-const resizeCanvas = (width, height) => myT5.resizeCanvas(width, height);
-const frameRate = (value) => myT5.frameRate(value);
-const smooth = () => myT5.smooth();
-const noSmooth = () => myT5.noSmooth();
-const fillArea = (x, y, color) => myT5.fillArea(x, y, color);
-// Aliases for global scope
-const drawingContext = myT5.canvas.getContext('2d');
-const createCanvas = (width, height) => myT5.createCanvas(width, height);
-const flexibleCanvas = (unit) => myT5.dimensionAgnostic(unit);
-const disableContextMenu = () => myT5.disableContextMenu();
-const pixelDensity = (val) => myT5.pixelDensity(val);
-const saveCanvas = (filename, extension) => myT5.saveCanvas(filename, extension);
-const createBuffer = (width, height) => myT5.createBuffer(width, height);
-const drawToBuffer = (buffer) => myT5.drawToBuffer(buffer);
-const drawToCanvas = () => myT5.drawToCanvas();
-const fill = (...args) => myT5.fill(...args);
-const noFill = () => myT5.noFill();
-const stroke = (...args) => myT5.stroke(...args);
-const noStroke = () => myT5.noStroke();
-const setStrokeType = (type) => myT5.setStrokeType(type);
-const strokeWeight = (weight) => myT5.strokeWeight(weight);
-const background = (...args) => myT5.background(...args);
-const borderRadius = (...radii) => myT5.borderRadius(...radii);
-const setTexture = (imageOrBuffer, mode) => myT5.setTexture(imageOrBuffer, mode);
-const beginShape = () => myT5.beginShape();
-const vertex = (x, y) => myT5.vertex(x, y);
-const endShape = (close = true) => myT5.endShape(close);
-const noise = (x, y = 0, z = 0) => myT5.noise(x, y, z);
-const random = (min, max) => myT5.random(min, max);
-const randomSeed = (seed) => myT5.randomSeed(seed);
-const noiseSeed = (seed) => myT5.noiseSeed(seed);
-
-const loadImage = (path, callback) => myT5.loadImage(path, callback);
-const image = (img, x, y, width, height, mode) => myT5.image(img, x, y, width, height, mode);
-
-const viewBuffer = (buffer, x = 0, y = 0) => myT5.viewBuffer(buffer, x, y);
-const hideBuffer = () => myT5.hideBuffer();
-
-const noLoop = () => myT5.noLoop();
-const loop = () => myT5.loop();
-
-const ellipse = (x, y, width, height) => myT5.ellipse(x, y, width, height);
-const circle = (x, y, size) => myT5.ellipse(x, y, size, size);
-const point = (x, y) => myT5.point(x, y);
-const rect = (x, y, width, height) => myT5.rect(x, y, width, height);
-const square = (x, y, size) => myT5.rect(x, y, size, size);
-const line = (x, y, x2, y2) => myT5.line(x, y, x2, y2);
-const triangle = (x1, y1, x2, y2, x3, y3) => myT5.triangle(x1, y1, x2, y2, x3, y3);
-const quad = (x1, y1, x2, y2, x3, y3, x4, y4) => myT5.quad(x1, y1, x2, y2, x3, y3, x4, y4);
-const polygon = (x, y, radius, verts) => myT5.polygon(x, y, radius, verts);
-
-const erase = (fillStrength, strokeStrength) => myT5.erase(fillStrength, strokeStrength);
-const noErase = () => myT5.noErase();
-const clear = () => myT5.clear();
-
-
-// Mathematical constants
-const PI = Math.PI;
-const TWO_PI = Math.PI * 2;
-const HALF_PI = Math.PI / 2;
-const QUARTER_PI = Math.PI / 4;
-
-// Trigonometric functions
-const cos = Math.cos;
-const sin = Math.sin;
-const tan = Math.tan;
-const acos = Math.acos;
-const asin = Math.asin;
-const atan = Math.atan;
-const atan2 = Math.atan2;
-
-// Angle conversion
-const radians = (degrees) => degrees * (Math.PI / 180);
-const degrees = (radians) => radians * (180 / Math.PI);
-
-// Linear interpolation
-const lerp = (start, stop, amt) => start + (stop - start) * amt;
-const norm = (value, start, stop) => (value - start) / (stop - start);
-
-// Mapping a range of values
-const map = (value, start1, stop1, start2, stop2) => start2 + ((value - start1) / (stop1 - start1)) * (stop2 - start2);
-
-// Distance calculation
-const dist = (x1, y1, x2, y2) => Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-
-// Constrain a number to a range
-const constrain = (n, low, high) => Math.max(Math.min(n, high), low);
-
-// Mathematical functions
-const max = (...values) => Math.max(...values);
-const min = (...values) => Math.min(...values);
-const abs = (value) => Math.abs(value);
-const floor = (value) => Math.floor(value);
-const ceil = (value) => Math.ceil(value);
-const round = (value) => Math.round(value);
-const sq = (value) => value * value;
-// const fract = (value) => value - Math.floor(value); 
-
-// Exponential functions
-const exp = (value) => Math.exp(value);
-const log = (value) => Math.log(value);
-const pow = (base, exp) => Math.pow(base, exp);
-const sqrt = (value) => Math.sqrt(value);
-// const mag = (x, y) => Math.sqrt(x * x + y * y); 
-
-// Type conversion functions
-const float = (value) => parseFloat(value);
-const int = (value) => parseInt(value, 10);
-const str = (value) => String(value);
-const boolean = (value) => Boolean(value);
-const byte = (value) => value & 0xFF;
-const char = (value) => String.fromCharCode(value);
-const unchar = (value) => value.charCodeAt(0);
-const hex = (value, digits = 2) => value.toString(16).padStart(digits, '0');
-const unhex = (value) => parseInt(value, 16);
-
-// Time & Date Functions
-const day = () => new Date().getDate();
-const hour = () => new Date().getHours();
-const minute = () => new Date().getMinutes();
-const millis = () => new Date().getTime();
-const month = () => new Date().getMonth() + 1;
-const second = () => new Date().getSeconds();
-const year = () => new Date().getFullYear();
-
-// Array Functions
-const append = (array, value) => {
-    array.push(value);
-    return array;
-};
-
-const arrayCopy = (src, srcPos = 0, dst = [], dstPos = 0, length = src.length) => {
-    for (let i = 0; i < length; i++) {
-        dst[dstPos + i] = src[srcPos + i];
-    }
-    return dst;
-};
-
-const concat = (...arrays) => {
-    return [].concat(...arrays);
-};
-
-const reverse = (array) => {
-    return array.slice().reverse();
-};
-
-const shorten = (array) => {
-    array.pop();
-    return array;
-};
-
-const shuffle = (array) => {
-    for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(this.randomGenerator.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
-};
-
-const sort = (array, compareFunction) => {
-    return array.slice().sort(compareFunction);
-};
-
-const splice = (array, start, deleteCount, ...items) => {
-    return array.splice(start, deleteCount, ...items);
-};
-
-const subset = (array, start, count) => {
-    return array.slice(start, start + count);
-};
-
-// Utility functions
-const push = () => myT5.push();
-const pop = () => myT5.pop();
-const translate = (x, y) => myT5.translate(x, y);
-const rotate = (angle) => myT5.rotate(angle);
-const scale = (sx, sy) => myT5.scale(sx, sy);
-const resetMatrix = () => myT5.resetMatrix();
-const applyMatrix = (a, b, c, d, e, f) => myT5.applyMatrix(a, b, c, d, e, f);
-const shearX = (angle) => myT5.shearX(angle);
-const shearY = (angle) => myT5.shearY(angle);
-
-
-// Color functions
-function color(r, g, b, a) {
-    if (typeof r === 'string') {
-        return parseColorString(r);
-    } else if (typeof r === 'number' && g === undefined) {
-        return `rgba(${r},${r},${r},1)`;
-    } else if (typeof r === 'number' && typeof g === 'number' && b === undefined) {
-        return `rgba(${r},${r},${r},${g / 255})`;
-    } else if (typeof r === 'number' && typeof g === 'number' && typeof b === 'number') {
-        a = a === undefined ? 255 : a;
-        return `rgba(${r},${g},${b},${a / 255})`;
-    }
-    throw new Error('Invalid color format');
-}
-
-function parseColorString(colorStr) {
-    colorStr = colorStr.trim();
-    if (colorStr.startsWith('#')) {
-        if (colorStr.length === 7) {
-            return hex6ToRgba(colorStr);
-        } else if (colorStr.length === 9) {
-            return hex8ToRgba(colorStr);
-        } else if (colorStr.length === 4) {
-            return hex3ToRgba(colorStr);
-        }
-    } else if (colorStr.startsWith('rgb') || colorStr.startsWith('rgba')) {
-        return colorStr;
-    }
-    throw new Error('Invalid color string format');
-}
-
-function hex6ToRgba(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r},${g},${b},1)`;
-}
-
-function hex8ToRgba(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const a = parseInt(hex.slice(7, 9), 16) / 255;
-    return `rgba(${r},${g},${b},${a})`;
-}
-
-function hex3ToRgba(hex) {
-    const r = parseInt(hex[1] + hex[1], 16);
-    const g = parseInt(hex[2] + hex[2], 16);
-    const b = parseInt(hex[3] + hex[3], 16);
-    return `rgba(${r},${g},${b},1)`;
-}
-
-function red(c) {
-    return getColorComponents(c).r;
-}
-
-function green(c) {
-    return getColorComponents(c).g;
-}
-
-function blue(c) {
-    return getColorComponents(c).b;
-}
-
-function alpha(c) {
-    return getColorComponents(c).a;
-}
-function lerpColor(c1, c2, amt) {
-    const color1 = getColorComponents(c1);
-    const color2 = getColorComponents(c2);
-
-    const r = Math.round(lerp(color1.r, color2.r, amt));
-    const g = Math.round(lerp(color1.g, color2.g, amt));
-    const b = Math.round(lerp(color1.b, color2.b, amt));
-    const a = lerp(color1.a, color2.a, amt) / 255;
-
-    return `rgba(${r},${g},${b},${a})`;
-}
-
-function getColorComponents(c) {
-    if (typeof c === 'string') {
-        c = c.trim();
-        if (c.startsWith('#')) {
-            if (c.length === 7) {
-                return hex6ToComponents(c);
-            } else if (c.length === 9) {
-                return hex8ToComponents(c);
-            } else if (c.length === 4) {
-                return hex3ToComponents(c);
+    // Draw wrapped text
+    $.drawWrappedText = function (text, x, y, maxWidth) {
+        let words = text.split(' ');
+        let line = '';
+        for (let i = 0; i < words.length; i++) {
+            let testLine = line + words[i] + ' ';
+            let metrics = $.context.measureText(testLine);
+            let testWidth = metrics.width;
+            if (testWidth > maxWidth && i > 0) {
+                if ($.context.fillStyle) {
+                    $.context.fillText(line, x, y);
+                }
+                if ($.context.strokeStyle) {
+                    $.context.strokeText(line, x, y);
+                }
+                line = words[i] + ' ';
+                y += $.textLeadingVal;
+            } else {
+                line = testLine;
             }
-        } else if (c.startsWith('rgba') || c.startsWith('rgb')) {
-            return rgbaStringToComponents(c);
         }
-    }
-    throw new Error('Invalid color format');
-}
+        if ($.context.fillStyle) {
+            $.context.fillText(line, x, y);
+        }
+        if ($.context.strokeStyle) {
+            $.context.strokeText(line, x, y);
+        }
 
-function hex6ToComponents(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return { r, g, b, a: 255 };
-}
+    };
 
-function hex8ToComponents(hex) {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    const a = parseInt(hex.slice(7, 9), 16);
-    return { r, g, b, a };
-}
+};
 
-function hex3ToComponents(hex) {
-    const r = parseInt(hex[1] + hex[1], 16);
-    const g = parseInt(hex[2] + hex[2], 16);
-    const b = parseInt(hex[3] + hex[3], 16);
-    return { r, g, b, a: 255 };
-}
-
-function rgbaStringToComponents(rgba) {
-    const match = rgba.match(/rgba?\((\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),\s*(\d+(?:\.\d+)?),?\s*([\d.]*)\)/);
-    if (match) {
-        const r = Math.round(parseFloat(match[1]));
-        const g = Math.round(parseFloat(match[2]));
-        const b = Math.round(parseFloat(match[3]));
-        const a = match[4] ? parseFloat(match[4]) * 255 : 255;
-        return { r, g, b, a };
-    }
-    throw new Error('Invalid rgba string format');
-}
-//**************************************************************************//
-//********************************-T5Vector-********************************//
-//**************************************************************************//
-
-class T5Vector {
-    constructor(x = 0, y = 0, z = 0) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-
-    toString() {
-        return `T5Vector(${this.x}, ${this.y}, ${this.z})`;
-    }
-
-    set(x, y, z) {
-        if (x instanceof T5Vector) {
-            this.x = x.x;
-            this.y = x.y;
-            this.z = x.z;
-        } else if (Array.isArray(x)) {
-            this.x = x[0] || 0;
-            this.y = x[1] || 0;
-            this.z = x[2] || 0;
-        } else {
+// Apply the text module
+T5.addOns.text(T5.prototype, T5.prototype);
+//************************************************************************//
+//*******************************-T5Vector-*******************************//
+//************************************************************************//
+T5.addOns.vector = ($, p, globalScope) => {
+    class Vector {
+        constructor(x, y, z) {
             this.x = x || 0;
             this.y = y || 0;
             this.z = z || 0;
         }
-        return this;
-    }
 
-    copy() {
-        return new T5Vector(this.x, this.y, this.z);
-    }
-
-    add(v) {
-        if (v instanceof T5Vector) {
-            this.x += v.x;
-            this.y += v.y;
-            this.z += v.z;
-        } else if (Array.isArray(v)) {
-            this.x += v[0] || 0;
-            this.y += v[1] || 0;
-            this.z += v[2] || 0;
-        } else {
-            this.x += v || 0;
-            this.y += v || 0;
-            this.z += v || 0;
-        }
-        return this;
-    }
-
-    rem(v) {
-        if (v instanceof T5Vector) {
-            this.x %= v.x;
-            this.y %= v.y;
-            this.z %= v.z;
-        } else if (Array.isArray(v)) {
-            this.x %= v[0] || 1;
-            this.y %= v[1] || 1;
-            this.z %= v[2] || 1;
-        } else {
-            this.x %= v || 1;
-            this.y %= v || 1;
-            this.z %= v || 1;
-        }
-        return this;
-    }
-
-    sub(v) {
-        if (v instanceof T5Vector) {
-            this.x -= v.x;
-            this.y -= v.y;
-            this.z -= v.z;
-        } else if (Array.isArray(v)) {
-            this.x -= v[0] || 0;
-            this.y -= v[1] || 0;
-            this.z -= v[2] || 0;
-        } else {
-            this.x -= v || 0;
-            this.y -= v || 0;
-            this.z -= v || 0;
-        }
-        return this;
-    }
-
-    mult(v) {
-        if (v instanceof T5Vector) {
-            this.x *= v.x;
-            this.y *= v.y;
-            this.z *= v.z;
-        } else if (Array.isArray(v)) {
-            this.x *= v[0] || 1;
-            this.y *= v[1] || 1;
-            this.z *= v[2] || 1;
-        } else {
-            this.x *= v || 1;
-            this.y *= v || 1;
-            this.z *= v || 1;
-        }
-        return this;
-    }
-
-    div(v) {
-        if (v instanceof T5Vector) {
-            this.x /= v.x;
-            this.y /= v.y;
-            this.z /= v.z;
-        } else if (Array.isArray(v)) {
-            this.x /= v[0] || 1;
-            this.y /= v[1] || 1;
-            this.z /= v[2] || 1;
-        } else {
-            this.x /= v || 1;
-            this.y /= v || 1;
-            this.z /= v || 1;
-        }
-        return this;
-    }
-
-    mag() {
-        return Math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z);
-    }
-
-    magSq() {
-        return this.x * this.x + this.y * this.y + this.z * this.z;
-    }
-
-    dot(v) {
-        return this.x * v.x + this.y * v.y + this.z * v.z;
-    }
-
-    cross(v) {
-        const crossX = this.y * v.z - this.z * v.y;
-        const crossY = this.z * v.x - this.x * v.z;
-        const crossZ = this.x * v.y - this.y * v.x;
-        return new T5Vector(crossX, crossY, crossZ);
-    }
-
-    dist(v) {
-        const dx = this.x - v.x;
-        const dy = this.y - v.y;
-        const dz = this.z - v.z;
-        return Math.sqrt(dx * dx + dy * dy + dz * dz);
-    }
-
-    normalize() {
-        const len = this.mag();
-        if (len !== 0) {
-            this.div(len);
-        }
-        return this;
-    }
-
-    limit(max) {
-        if (this.mag() > max) {
-            this.normalize();
-            this.mult(max);
-        }
-        return this;
-    }
-
-    setMag(len) {
-        this.normalize();
-        this.mult(len);
-        return this;
-    }
-
-    heading() {
-        return Math.atan2(this.y, this.x);
-    }
-
-    setHeading(angle) {
-        const mag = this.mag();
-        this.x = Math.cos(angle) * mag;
-        this.y = Math.sin(angle) * mag;
-        return this;
-    }
-
-    rotate(angle) {
-        const newHeading = this.heading() + angle;
-        const mag = this.mag();
-        this.x = Math.cos(newHeading) * mag;
-        this.y = Math.sin(newHeading) * mag;
-        return this;
-    }
-
-    angleBetween(v) {
-        const dotmagmag = this.dot(v) / (this.mag() * v.mag());
-        return Math.acos(Math.max(-1, Math.min(1, dotmagmag)));
-    }
-
-    lerp(v, amt) {
-        this.x = lerp(this.x, v.x, amt);
-        this.y = lerp(this.y, v.y, amt);
-        this.z = lerp(this.z, v.z, amt);
-        return this;
-    }
-
-    slerp(v, amt) {
-        const omega = this.angleBetween(v);
-        const sinOmega = Math.sin(omega);
-        const scale0 = Math.sin((1 - amt) * omega) / sinOmega;
-        const scale1 = Math.sin(amt * omega) / sinOmega;
-
-        this.x = scale0 * this.x + scale1 * v.x;
-        this.y = scale0 * this.y + scale1 * v.y;
-        this.z = scale0 * this.z + scale1 * v.z;
-        return this;
-    }
-
-    reflect(n) {
-        const dot2 = this.dot(n) * 2;
-        this.x = this.x - n.x * dot2;
-        this.y = this.y - n.y * dot2;
-        this.z = this.z - n.z * dot2;
-        return this;
-    }
-
-    array() {
-        return [this.x, this.y, this.z];
-    }
-
-    equals(v) {
-        return this.x === v.x && this.y === v.y && this.z === v.z;
-    }
-
-    static add(v1, v2) {
-        return v1.copy().add(v2);
-    }
-
-    static sub(v1, v2) {
-        return v1.copy().sub(v2);
-    }
-
-    static mult(v, n) {
-        return v.copy().mult(n);
-    }
-
-    static div(v, n) {
-        return v.copy().div(n);
-    }
-
-    static dist(v1, v2) {
-        return v1.dist(v2);
-    }
-
-    static dot(v1, v2) {
-        return v1.dot(v2);
-    }
-
-    static cross(v1, v2) {
-        return v1.cross(v2);
-    }
-
-    static fromAngle(angle) {
-        return new T5Vector(Math.cos(angle), Math.sin(angle));
-    }
-
-    static fromAngles(theta, phi) {
-        return new T5Vector(
-            Math.cos(theta) * Math.cos(phi),
-            Math.sin(theta),
-            Math.cos(theta) * Math.sin(phi)
-        );
-    }
-}
-
-// Aliases for global scope
-const createVector = (x, y, z) => new T5Vector(x, y, z);
-//*************************************************************************//
-//********************************-T5Input-********************************//
-//*************************************************************************//
-
-class T5Input {
-    constructor(baseT5) {
-        this.baseT5 = baseT5;
-        this.keysPressed = new Set();
-        this.keyIsPressed = false;
-        this.key = '';
-        this.keyCode = 0;
-        this.mouseButton = '';
-        this.mouseIsPressed = false;
-        this.movedX = 0;
-        this.movedY = 0;
-        this._mouseX = 0;
-        this._mouseY = 0;
-        this._pmouseX = 0;
-        this._pmouseY = 0;
-        this._winMouseX = 0;
-        this._winMouseY = 0;
-        this._pwinMouseX = 0;
-        this._pwinMouseY = 0;
-        this._initEventListeners();
-    }
-
-    _initEventListeners() {
-        document.addEventListener('keydown', (e) => this._keyPressed(e));
-        document.addEventListener('keyup', (e) => this._keyReleased(e));
-        document.addEventListener('keypress', (e) => this._keyTyped(e));
-        document.addEventListener('mousemove', (e) => this._onmousemove(e));
-        document.addEventListener('mousedown', (e) => this._onmousedown(e));
-        document.addEventListener('mouseup', (e) => this._onmouseup(e));
-        document.addEventListener('click', (e) => this._onclick(e));
-        document.addEventListener('dblclick', (e) => this._doubleClicked(e));
-        document.addEventListener('wheel', (e) => this._mouseWheel(e));
-    }
-
-    _keyPressed(e) {
-        this.keysPressed.add(e.keyCode);
-        this.keyIsPressed = true;
-        this.key = e.key;
-        this.keyCode = e.keyCode;
-        if (typeof window.keyPressed === 'function') {
-            window.keyPressed(e);
-        }
-    }
-
-    _keyReleased(e) {
-        this.keysPressed.delete(e.keyCode);
-        this.keyIsPressed = this.keysPressed.size > 0;
-        if (this.keysPressed.size > 0) {
-            const iterator = this.keysPressed.values();
-            this.key = String.fromCharCode(iterator.next().value);
-        } else {
-            this.key = '';
-            this.keyCode = 0;
-        }
-        if (typeof window.keyReleased === 'function') {
-            window.keyReleased(e);
-        }
-    }
-
-    _keyTyped(e) {
-        if (typeof window.keyTyped === 'function') {
-            window.keyTyped(e);
-        }
-    }
-
-    _onmousemove(e) {
-        this._updateMouse(e);
-        if (this.mouseIsPressed) {
-            if (typeof window.mouseDragged === 'function') {
-                window.mouseDragged(e);
-            }
-        } else {
-            if (typeof window.mouseMoved === 'function') {
-                window.mouseMoved(e);
-            }
-        }
-    }
-
-    _onmousedown(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = true;
-        this.mouseButton = ['left', 'middle', 'right'][e.button];
-        if (typeof window.mousePressed === 'function') {
-            window.mousePressed(e);
-        }
-    }
-
-    _onmouseup(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = false;
-        if (typeof window.mouseReleased === 'function') {
-            window.mouseReleased(e);
-        }
-    }
-
-    _onclick(e) {
-        this._updateMouse(e);
-        this.mouseIsPressed = true;
-        if (typeof window.mouseClicked === 'function') {
-            window.mouseClicked(e);
-        }
-        this.mouseIsPressed = false;
-    }
-
-    _doubleClicked(e) {
-        if (typeof window.doubleClicked === 'function') {
-            window.doubleClicked(e);
-        }
-    }
-
-    _mouseWheel(e) {
-        if (typeof window.mouseWheel === 'function') {
-            window.mouseWheel(e);
-        }
-    }
-
-    _calculateCanvasMetrics() {
-        const { canvas } = this.baseT5;
-        const rect = canvas.getBoundingClientRect();
-        const aspectRatioCanvas = canvas.width / canvas.height;
-        const aspectRatioRect = rect.width / rect.height;
-
-        const isCanvasWider = aspectRatioCanvas > aspectRatioRect;
-        const displayedWidth = isCanvasWider ? rect.width : rect.height * aspectRatioCanvas;
-        const displayedHeight = isCanvasWider ? rect.width / aspectRatioCanvas : rect.height;
-
-        this.canvasMetrics = {
-            offsetX: (rect.width - displayedWidth) / 2,
-            offsetY: (rect.height - displayedHeight) / 2,
-            scaleX: canvas.width / displayedWidth,
-            scaleY: canvas.height / displayedHeight,
-            rect,
-            width: window.innerWidth,
-            height: window.innerHeight
-        };
-    }
-
-    _updateMouse(e) {
-        if (e.changedTouches) return;
-
-        const { canvasMetrics } = this;
-        if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
-            this._calculateCanvasMetrics();
+        set(x, y, z) {
+            this.x = x || 0;
+            this.y = y || 0;
+            this.z = z || 0;
         }
 
-        const { offsetX, offsetY, scaleX, scaleY, rect } = this.canvasMetrics;
-        const scrollX = window.scrollX || window.pageXOffset;
-        const scrollY = window.scrollY || window.pageYOffset;
-
-        this._pmouseX = this._mouseX;
-        this._pmouseY = this._mouseY;
-        this._mouseX = (e.clientX - rect.left - offsetX + scrollX) * scaleX;
-        this._mouseY = (e.clientY - rect.top - offsetY + scrollY) * scaleY;
-        this._pwinMouseX = this._winMouseX;
-        this._pwinMouseY = this._winMouseY;
-        this._winMouseX = e.clientX + scrollX;
-        this._winMouseY = e.clientY + scrollY;
-    }
-
-    keyIsDown(keyCode) {
-        return this.keysPressed.has(keyCode);
-    }
-
-    requestPointerLock() {
-        if (this.baseT5.canvas) {
-            this.baseT5.canvas.requestPointerLock();
+        copy() {
+            return new Vector(this.x, this.y, this.z);
         }
-    }
 
-    exitPointerLock() {
-        document.exitPointerLock();
-    }
-
-    cursor(type = 'default', x = 0, y = 0) {
-        const canvas = this.baseT5.canvas;
-        const types = {
-            ARROW: 'default',
-            CROSS: 'crosshair',
-            HAND: 'pointer',
-            MOVE: 'move',
-            TEXT: 'text',
-            WAIT: 'wait'
-        };
-
-        if (types[type]) {
-            canvas.style.cursor = types[type];
-        } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
-            canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
-        } else {
-            canvas.style.cursor = type;
-        }
-    }
-
-    noCursor() {
-        const canvas = this.baseT5.canvas;
-        canvas.style.cursor = 'none';
-    }
-
-    get mouseX() {
-        return this._scaleCoordinate(this._mouseX);
-    }
-
-    get mouseY() {
-        return this._scaleCoordinate(this._mouseY);
-    }
-
-    get pmouseX() {
-        return this._scaleCoordinate(this._pmouseX);
-    }
-
-    get pmouseY() {
-        return this._scaleCoordinate(this._pmouseY);
-    }
-
-    get winMouseX() {
-        return this._scaleCoordinate(this._winMouseX);
-    }
-
-    get winMouseY() {
-        return this._scaleCoordinate(this._winMouseY);
-    }
-
-    get pwinMouseX() {
-        return this._scaleCoordinate(this._pwinMouseX);
-    }
-
-    get pwinMouseY() {
-        return this._scaleCoordinate(this._pwinMouseY);
-    }
-
-    _scaleCoordinate(coord) {
-        if (this.baseT5.dimensionAgnosticMode) {
-            return (coord / this.baseT5.canvas.width * this.baseT5.pixelDensityValue) * this.baseT5.dimensionUnit;
-        }
-        return coord;
-    }
-}
-
-const myT5Input = new T5Input(myT5);
-
-const properties = [
-    'mouseX', 'mouseY', 'pmouseX', 'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
-    'mouseButton', 'mouseIsPressed'
-];
-
-properties.forEach(prop => {
-    Object.defineProperty(window, prop, {
-        get: function () {
-            return myT5Input[prop];
-        }
-    });
-});
-
-// Alias input functions for global scope
-const keyIsPressed = () => myT5Input.keyIsPressed;
-const key = () => myT5Input.key;
-Object.defineProperty(window, 'keyCode', {
-    get: function () {
-        return myT5Input.keyCode;
-    }
-});
-const keyIsDown = (code) => myT5Input.keyIsDown(code);
-const movedX = () => myT5Input.movedX;
-const movedY = () => myT5Input.movedY;
-const requestPointerLock = () => myT5Input.requestPointerLock();
-const exitPointerLock = () => myT5Input.exitPointerLock();
-const cursor = (type, x, y) => myT5Input.cursor(type, x, y);
-const noCursor = () => myT5Input.noCursor();
-
-
-
-// Key codes
-const ALT = 18;
-const BACKSPACE = 8;
-const CONTROL = 17;
-const DELETE = 46;
-const DOWN_ARROW = 40;
-const ENTER = 13;
-const ESCAPE = 27;
-const LEFT_ARROW = 37;
-const OPTION = 18;
-const RETURN = 13;
-const RIGHT_ARROW = 39;
-const SHIFT = 16;
-const TAB = 9;
-const UP_ARROW = 38;
-// Navigation keys
-const HOME = 36;
-const END = 35;
-const PAGE_UP = 33;
-const PAGE_DOWN = 34;
-// Modifier keys
-const CAPS_LOCK = 20;
-const NUM_LOCK = 144;
-// Special characters
-const SPACE = 32;
-const INSERT = 45;
-const PRINT_SCREEN = 44;
-// Cursor types
-const ARROW = 'default';
-const CROSS = 'crosshair';
-const HAND = 'pointer';
-const MOVE = 'move';
-const TEXT = 'text';
-const WAIT = 'wait';
-const HELP = 'help';
-const NOT_ALLOWED = 'not-allowed';
-const ZOOM_IN = 'zoom-in';
-const ZOOM_OUT = 'zoom-out';
-const GRAB = 'grab';
-const GRABBING = 'grabbing';
-const RESIZE_NW = 'nw-resize';
-const RESIZE_NE = 'ne-resize';
-const RESIZE_SW = 'sw-resize';
-const RESIZE_SE = 'se-resize';
-const RESIZE_E = 'e-resize';
-const RESIZE_W = 'w-resize';
-const RESIZE_N = 'n-resize';
-const RESIZE_S = 's-resize';
-//************************************************************************//
-//********************************-T5Text-********************************//
-//************************************************************************//
-
-class T5Text {
-    constructor(baseT5) {
-        this.baseT5 = baseT5;
-        this.baseT5.textSize = 16;
-        this.baseT5.textFont = 'Arial, sans-serif'; // Arial for better emoji support
-        this.baseT5.textAlign = 'left';
-        this.baseT5.textBaseline = 'alphabetic';
-        this.baseT5.textLeading = 1.2;
-        this.baseT5.textStyle = 'normal';
-        this.baseT5.textWrap = 'word';
-        this.baseT5.letterSpacing = 0;
-    }
-
-    textSize(size) {
-        this.baseT5.textSize = size;
-    }
-
-    textFont(font) {
-        this.baseT5.textFont = font;
-    }
-
-    textAlign(horizAlign, vertAlign = 'alphabetic') {
-        this.baseT5.textAlign = horizAlign;
-        this.baseT5.textBaseline = vertAlign;
-    }
-
-    textLeading(leading) {
-        this.baseT5.textLeading = leading;
-    }
-
-    textStyle(style) {
-        this.baseT5.textStyle = style;
-    }
-
-    textWrap(wrap) {
-        this.baseT5.textWrap = wrap;
-    }
-
-    letterSpacing(spacing) {
-        this.baseT5.letterSpacing = spacing;
-    }
-
-    textWidth(text) {
-        const ctx = this.baseT5.context
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
-            let width = 0;
-            for (let i = 0; i < text.length; i++) {
-                width += ctx.measureText(text[i]).width + spacing;
-            }
-            return width - spacing;
-        }
-        return 0;
-    }
-
-    textAscent() {
-        const ctx = this.baseT5.context
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            return ctx.measureText('M').actualBoundingBoxAscent;
-        }
-        return 0;
-    }
-
-    textDescent() {
-        const ctx = this.baseT5.context
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            return ctx.measureText('g').actualBoundingBoxDescent;
-        }
-        return 0;
-    }
-
-    loadFont(path, callback) {
-        const font = new FontFace('customFont', `url(${path})`);
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            if (callback) callback(loadedFont);
-        }).catch((error) => {
-            console.error('Error loading font:', error);
-            if (callback) callback(null);
-        });
-    }
-
-    text(text, x, y) {
-        const ctx = this.baseT5.context
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            ctx.textAlign = this.baseT5.textAlign;
-            ctx.textBaseline = this.baseT5.textBaseline;
-            ctx.fillStyle = this.baseT5.fillStyle;
-            ctx.strokeStyle = this.baseT5.strokeStyle;
-
-            const scaledX = this.baseT5._scaleCoordinate(x);
-            const scaledY = this.baseT5._scaleCoordinate(y);
-
-            if (this.baseT5.fillStyle) {
-                ctx.fillText(text, scaledX, scaledY);
-            }
-            if (this.baseT5.strokeStyle) {
-                ctx.lineWidth = this.baseT5.strokeWidth;
-                ctx.strokeText(text, scaledX, scaledY);
-            }
-        }
-    }
-
-    multilineText(text, x, y, maxWidth) {
-        const ctx = this.baseT5.context
-        if (ctx) {
-            ctx.font = `${this.baseT5.textStyle} ${this.baseT5._scaleCoordinate(this.baseT5.textSize)}px ${this.baseT5.textFont}`;
-            ctx.textAlign = this.baseT5.textAlign;
-            ctx.textBaseline = this.baseT5.textBaseline;
-            ctx.fillStyle = this.baseT5.fillStyle;
-            ctx.strokeStyle = this.baseT5.strokeStyle;
-            const spacing = this.baseT5._scaleCoordinate(this.baseT5.letterSpacing);
-
-            const lines = this._wrapText(ctx, text, this.baseT5._scaleCoordinate(maxWidth));
-            let lineHeight = this.baseT5._scaleCoordinate(this.baseT5.textSize) * this.baseT5.textLeading;
-
-            for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                let currentY = y + i * lineHeight;
-                let currentX = this.baseT5._scaleCoordinate(x);
-                for (let j = 0; j < line.length; j++) {
-                    if (this.baseT5.fillStyle) {
-                        ctx.fillText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
-                    }
-                    if (this.baseT5.strokeStyle) {
-                        ctx.lineWidth = this.baseT5.strokeWidth;
-                        ctx.strokeText(line[j], currentX, this.baseT5._scaleCoordinate(currentY));
-                    }
-                    currentX += ctx.measureText(line[j]).width + spacing;
-                }
-            }
-        }
-    }
-
-    _wrapText(ctx, text, maxWidth) {
-        const words = text.split(' ');
-        const lines = [];
-        let currentLine = words[0];
-
-        for (let i = 1; i < words.length; i++) {
-            const word = words[i];
-            const width = ctx.measureText(currentLine + ' ' + word).width;
-            if (width < maxWidth) {
-                currentLine += ' ' + word;
+        _arg2v(...args) {
+            if (args.length === 1 && typeof args[0] === 'object') {
+                return args[0];
+            } else if (args.length >= 2) {
+                return { x: args[0], y: args[1], z: args[2] || 0 };
             } else {
-                lines.push(currentLine);
-                currentLine = word;
+                return { x: args[0], y: args[0], z: args[0] };
             }
         }
-        lines.push(currentLine);
-        return lines;
+
+        _calcNorm() {
+            this._cnsq = this.x * this.x + this.y * this.y + this.z * this.z;
+            this._cn = Math.sqrt(this._cnsq);
+        }
+
+        add(...args) {
+            let u = this._arg2v(...args);
+            this.x += u.x;
+            this.y += u.y;
+            this.z += u.z;
+            return this;
+        }
+
+        rem(...args) {
+            let u = this._arg2v(...args);
+            this.x %= u.x;
+            this.y %= u.y;
+            this.z %= u.z;
+            return this;
+        }
+
+        sub(...args) {
+            let u = this._arg2v(...args);
+            this.x -= u.x;
+            this.y -= u.y;
+            this.z -= u.z;
+            return this;
+        }
+
+        mult(...args) {
+            let u = this._arg2v(...args);
+            this.x *= u.x;
+            this.y *= u.y;
+            this.z *= u.z;
+            return this;
+        }
+
+        div(...args) {
+            let u = this._arg2v(...args);
+            if (u.x) this.x /= u.x;
+            else this.x = 0;
+            if (u.y) this.y /= u.y;
+            else this.y = 0;
+            if (u.z) this.z /= u.z;
+            else this.z = 0;
+            return this;
+        }
+
+        mag() {
+            this._calcNorm();
+            return this._cn;
+        }
+
+        magSq() {
+            this._calcNorm();
+            return this._cnsq;
+        }
+
+        dot(...args) {
+            let u = this._arg2v(...args);
+            return this.x * u.x + this.y * u.y + this.z * u.z;
+        }
+
+        dist(...args) {
+            let u = this._arg2v(...args);
+            let x = this.x - u.x;
+            let y = this.y - u.y;
+            let z = this.z - u.z;
+            return Math.sqrt(x * x + y * y + z * z);
+        }
+
+        cross(...args) {
+            let u = this._arg2v(...args);
+            let x = this.y * u.z - this.z * u.y;
+            let y = this.z * u.x - this.x * u.z;
+            let z = this.x * u.y - this.y * u.x;
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            return this;
+        }
+
+        normalize() {
+            this._calcNorm();
+            let n = this._cn;
+            if (n != 0) {
+                this.x /= n;
+                this.y /= n;
+                this.z /= n;
+            }
+            this._cn = 1;
+            this._cnsq = 1;
+            return this;
+        }
+
+        limit(m) {
+            this._calcNorm();
+            let n = this._cn;
+            if (n > m) {
+                let t = m / n;
+                this.x *= t;
+                this.y *= t;
+                this.z *= t;
+                this._cn = m;
+                this._cnsq = m * m;
+            }
+            return this;
+        }
+
+        setMag(m) {
+            this._calcNorm();
+            let n = this._cn;
+            let t = m / n;
+            this.x *= t;
+            this.y *= t;
+            this.z *= t;
+            this._cn = m;
+            this._cnsq = m * m;
+            return this;
+        }
+
+        heading() {
+            return Math.atan2(this.y, this.x);
+        }
+
+        rotate(ang) {
+            let costh = Math.cos(ang);
+            let sinth = Math.sin(ang);
+            let vx = this.x * costh - this.y * sinth;
+            let vy = this.x * sinth + this.y * costh;
+            this.x = vx;
+            this.y = vy;
+            return this;
+        }
+
+        angleBetween(...args) {
+            let u = this._arg2v(...args);
+            let o = Vector.cross(this, u);
+            let ang = Math.atan2(o.mag(), this.dot(u));
+            return ang * Math.sign(o.z || 1);
+        }
+
+        lerp(...args) {
+            let amt = args.pop();
+            let u = this._arg2v(...args);
+            this.x += (u.x - this.x) * amt;
+            this.y += (u.y - this.y) * amt;
+            this.z += (u.z - this.z) * amt;
+            return this;
+        }
+
+        reflect(n) {
+            n.normalize();
+            return this.sub(n.mult(2 * this.dot(n)));
+        }
+
+        array() {
+            return [this.x, this.y, this.z];
+        }
+
+        equals(u, epsilon = Number.EPSILON) {
+            return Math.abs(u.x - this.x) < epsilon && Math.abs(u.y - this.y) < epsilon && Math.abs(u.z - this.z) < epsilon;
+        }
+
+        static fromAngle(th, l = 1) {
+            let v = new Vector();
+            v.x = l * Math.cos(th);
+            v.y = l * Math.sin(th);
+            v.z = 0;
+            v._cn = l;
+            v._cnsq = l * l;
+            return v;
+        }
+
+        static fromAngles(th, ph, l = 1) {
+            let v = new Vector();
+            const cosph = Math.cos(ph);
+            const sinph = Math.sin(ph);
+            const costh = Math.cos(th);
+            const sinth = Math.sin(th);
+            v.x = l * sinth * sinph;
+            v.y = -l * costh;
+            v.z = l * sinth * cosph;
+            v._cn = l;
+            v._cnsq = l * l;
+            return v;
+        }
+
+        static random2D() {
+            return Vector.fromAngle(Math.random() * Math.PI * 2);
+        }
+
+        static random3D() {
+            return Vector.fromAngles(Math.random() * Math.PI * 2, Math.random() * Math.PI * 2);
+        }
+
+        static add(v, u) {
+            return v.copy().add(u);
+        }
+
+        static cross(v, u) {
+            return v.copy().cross(u);
+        }
+
+        static dist(v, u) {
+            return Math.hypot(v.x - u.x, v.y - u.y, v.z - u.z);
+        }
+
+        static div(v, u) {
+            return v.copy().div(u);
+        }
+
+        static dot(v, u) {
+            return v.dot(u);
+        }
+
+        static equals(v, u, epsilon) {
+            return v.equals(u, epsilon);
+        }
+
+        static lerp(v, u, amt) {
+            return v.copy().lerp(u, amt);
+        }
+
+        static limit(v, m) {
+            return v.copy().limit(m);
+        }
+
+        static heading(v) {
+            return Math.atan2(v.y, v.x);
+        }
+
+        static magSq(v) {
+            return v.x * v.x + v.y * v.y + v.z * v.z;
+        }
+
+        static mag(v) {
+            return Math.sqrt(Vector.magSq(v));
+        }
+
+        static mult(v, u) {
+            return v.copy().mult(u);
+        }
+
+        static normalize(v) {
+            return v.copy().normalize();
+        }
+
+        static rem(v, u) {
+            return v.copy().rem(u);
+        }
+
+        static sub(v, u) {
+            return v.copy().sub(u);
+        }
     }
-}
 
-//T5Text instance link to T5 instance
-const myT5Text = new T5Text(myT5);
+    $.createVector = function (x, y, z) {
+        return new Vector(x, y, z);
+    };
 
-// Alias text functions for global scope
-const textSize = (size) => myT5Text.textSize(size);
-const textFont = (font) => myT5Text.textFont(font);
-const textAlign = (horizAlign, vertAlign) => myT5Text.textAlign(horizAlign, vertAlign);
-const text = (content, x, y) => myT5Text.text(content, x, y);
-const textWidth = (content) => myT5Text.textWidth(content);
-const textLeading = (leading) => myT5Text.textLeading(leading);
-const textLineHeight = (height) => myT5Text.textLineHeight(height);
-const textStyle = (style) => myT5Text.textStyle(style);
-const textAscent = () => myT5Text.textAscent();
-const textDescent = () => myT5Text.textDescent();
-const textWrap = (wrap) => myT5Text.textWrap(wrap);
-const letterSpacing = (spacing) => myT5Text.letterSpacing(spacing);
-const loadFont = (path, callback) => myT5Text.loadFont(path, callback);
-const multilineText = (content, x, y, maxWidth) => myT5Text.multilineText(content, x, y, maxWidth);
+    $.Vector = Vector;
 
-// Font styles
-const NORMAL = 'normal';
-const ITALIC = 'italic';
-const BOLD = 'bold';
-const BOLDITALIC = 'italic bold';
-const LIGHT = 'light';
-const UNDERLINE = 'underline';
-const STRIKETHROUGH = 'line-through';
-// Text alignment
-const CENTER = 'center';
-const LEFT = 'left';
-const RIGHT = 'right';
-const TOP = 'top';
-const BOTTOM = 'bottom';
-const BASELINE = 'alphabetic';
-const MIDDLE = 'middle';
-const HANGING = 'hanging';
-const IDEOGRAPHIC = 'ideographic';
+    if ($._isGlobal) {
+        globalScope.T5.Vector = Vector;
+        globalScope.T5.createVector = $.createVector;
+        globalScope.t5 = globalScope.t5 || {};
+        globalScope.t5.Vector = Vector;
+        globalScope.t5.createVector = $.createVector;
+        globalScope.p5 = globalScope.p5 || {};
+        globalScope.p5.Vector = Vector;
+        globalScope.p5.createVector = $.createVector;
+        globalScope.Q5 = globalScope.p5 || {};
+        globalScope.Q5.Vector = Vector;
+        globalScope.Q5.createVector = $.createVector;
+    }
+};
 
-// Horizontal alignment (textAlign):
-//     'left' (default)
-//     'right'
-//     'center'
-//     'start'
-//     'end'
-
-// Vertical alignment (textBaseline):
-//     'top'
-//     'hanging'
-//     'middle'
-//     'alphabetic' (default)
-//     'ideographic'
-//     'bottom'
-//***********************************************************************//
-//********************************-T5Dom-********************************//
-//***********************************************************************//
-
+// Integrate the vector add-on
+T5.addOns.vector(T5.prototype, T5.prototype, window);
+//************************************************************************//
+//********************************-T5Dom-*********************************//
+//************************************************************************//
 class T5Element {
     constructor(element) {
         this.element = element;
@@ -2266,7 +2494,7 @@ class T5Element {
 
     value(value) {
         if (value === undefined) {
-            return Number(this.element.value);
+            return this.element.value;
         } else {
             this.element.value = value;
             return this;
@@ -2333,590 +2561,1033 @@ class T5Element {
     input(callback) {
         return this._addEventListener('input', callback), this;
     }
-}
 
-class T5Dom {
-    constructor() {
-        this.elements = [];
-    }
-
-    select(selector) {
-        const el = document.querySelector(selector);
-        return el ? new T5Element(el) : null;
+    // New properties for .x, .y, .width, and .height
+    get x() {
+        return parseFloat(this.element.style.left || this.element.offsetLeft);
     }
 
-    selectAll(selector) {
-        const nodeList = document.querySelectorAll(selector);
-        return Array.from(nodeList).map(el => new T5Element(el));
+    set x(value) {
+        this.element.style.position = 'absolute';
+        this.element.style.left = `${value}px`;
     }
 
-    removeElements() {
-        this.elements.forEach(el => el.remove());
-        this.elements = [];
+    get y() {
+        return parseFloat(this.element.style.top || this.element.offsetTop);
     }
 
-    createElement(tag, html = '') {
-        const el = document.createElement(tag);
-        el.innerHTML = html;
-        document.body.appendChild(el);
-        const t5Element = new T5Element(el);
-        this.elements.push(t5Element);
-        return t5Element;
+    set y(value) {
+        this.element.style.position = 'absolute';
+        this.element.style.top = `${value}px`;
     }
 
-    createDiv(html = '') { return this.createElement('div', html); }
-    createP(html = '') { return this.createElement('p', html); }
-    createSpan(html = '') { return this.createElement('span', html); }
-    createImg(src, alt = '') {
-        const img = this.createElement('img');
-        img.attribute('src', src).attribute('alt', alt);
-        return img;
+    get width() {
+        return parseFloat(this.element.style.width || this.element.offsetWidth);
     }
-    createA(href, html = '') {
-        const a = this.createElement('a', html);
-        a.attribute('href', href);
-        return a;
+
+    set width(value) {
+        this.element.style.width = `${value}px`;
     }
-    createSlider(min, max, value, step) {
-        const slider = this.createElement('input');
-        slider.attribute('type', 'range')
-            .attribute('min', min)
-            .attribute('max', max)
-            .attribute('value', value)
-            .attribute('step', step);
-        return slider;
+
+    get height() {
+        return parseFloat(this.element.style.height || this.element.offsetHeight);
     }
-    createButton(label, callback) {
-        const button = this.createElement('button', label);
-        button.on('click', callback);
-        return button;
-    }
-    createCheckbox(label, checked) {
-        const checkbox = this.createElement('input');
-        checkbox.attribute('type', 'checkbox').checked(checked);
-        const labelEl = this.createElement('label', label);
-        labelEl.element.appendChild(checkbox.element);
-        return checkbox;
-    }
-    createSelect(options) {
-        const select = this.createElement('select');
-        options.forEach(option => {
-            const opt = document.createElement('option');
-            opt.value = option;
-            opt.innerHTML = option;
-            select.element.appendChild(opt);
-        });
-        return select;
-    }
-    createRadio(name, options) {
-        const radioGroup = this.createElement('div');
-        options.forEach(option => {
-            const radio = document.createElement('input');
-            radio.type = 'radio';
-            radio.name = name;
-            radio.value = option;
-            const label = document.createElement('label');
-            label.innerHTML = option;
-            label.appendChild(radio);
-            radioGroup.element.appendChild(label);
-        });
-        return radioGroup;
-    }
-    createColorPicker(value = '#000000') {
-        const colorPicker = this.createElement('input');
-        colorPicker.attribute('type', 'color').attribute('value', value);
-        return colorPicker;
-    }
-    createInput(value = '', type = 'text') {
-        const input = this.createElement('input');
-        input.attribute('type', type).attribute('value', value);
-        return input;
-    }
-    createFileInput(callback) {
-        const fileInput = this.createElement('input');
-        fileInput.attribute('type', 'file').on('change', callback);
-        return fileInput;
-    }
-    createVideo(src) {
-        const video = this.createElement('video');
-        video.attribute('src', src).attribute('controls', true);
-        return video;
-    }
-    createAudio(src) {
-        const audio = this.createElement('audio');
-        audio.attribute('src', src).attribute('controls', true);
-        return audio;
-    }
-    createCapture() {
-        const capture = this.createElement('video');
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            capture.element.srcObject = stream;
-            capture.element.play();
-        });
-        return capture;
+
+    set height(value) {
+        this.element.style.height = `${value}px`;
     }
 }
 
-// Alias DOM functions for global scope
-const myT5Dom = new T5Dom();
-const select = (selector) => myT5Dom.select(selector);
-const selectAll = (selector) => myT5Dom.selectAll(selector);
-const removeElements = () => myT5Dom.removeElements();
-const createDiv = (html) => myT5Dom.createDiv(html);
-const createP = (html) => myT5Dom.createP(html);
-const createSpan = (html) => myT5Dom.createSpan(html);
-const createImg = (src, alt) => myT5Dom.createImg(src, alt);
-const createA = (href, html) => myT5Dom.createA(href, html);
-const createSlider = (min, max, value, step) => myT5Dom.createSlider(min, max, value, step);
-const createButton = (label, callback) => myT5Dom.createButton(label, callback);
-const createCheckbox = (label, checked) => myT5Dom.createCheckbox(label, checked);
-const createSelect = (options) => myT5Dom.createSelect(options);
-const createRadio = (name, options) => myT5Dom.createRadio(name, options);
-const createColorPicker = (value) => myT5Dom.createColorPicker(value);
-const createInput = (value, type) => myT5Dom.createInput(value, type);
-const createFileInput = (callback) => myT5Dom.createFileInput(callback);
-const createVideo = (src) => myT5Dom.createVideo(src);
-const createAudio = (src) => myT5Dom.createAudio(src);
-const createCapture = () => myT5Dom.createCapture();
-const createElement = (tag, html) => myT5Dom.createElement(tag, html);
-
-//*************************************************************************//
-//********************************-T5Sound-********************************//
-//*************************************************************************//
-
-class T5Sound {
-    constructor(baseT5) {
-        this.baseT5 = baseT5;
-        this.sound = null;
-        this.loaded = false;
-        this.looping = false;
-        this.playing = false;
-        this.paused = false;
-        this.panValue = 0;
-        this.volume = 1;
-        this.rate = 1;
-        this.duration = 0;
+T5.addOns.dom = ($, p, globalScope) => {
+    if (!$.createElement) {
+        $.createElement = (tag, html = '') => {
+            const el = document.createElement(tag);
+            el.innerHTML = html;
+            document.body.appendChild(el);
+            return new T5Element(el);
+        };
     }
 
-    loadSound(path, callback) {
-        const audio = new Audio();
-        audio.src = path;
-        audio.addEventListener('canplaythrough', () => {
+
+
+    class T5Dom {
+        constructor() {
+            this.elements = [];
+        }
+
+        select(selector) {
+            const el = document.querySelector(selector);
+            return el ? new T5Element(el) : null;
+        }
+
+        selectAll(selector) {
+            const nodeList = document.querySelectorAll(selector);
+            return Array.from(nodeList).map(el => new T5Element(el));
+        }
+
+        removeElements() {
+            this.elements.forEach(el => el.remove());
+            this.elements = [];
+        }
+
+        createElement(tag, html = '') {
+            const el = document.createElement(tag);
+            el.innerHTML = html;
+            document.body.appendChild(el);
+            const t5Element = new T5Element(el);
+            this.elements.push(t5Element);
+            return t5Element;
+        }
+
+        createDiv(html = '') { return this.createElement('div', html); }
+        createP(html = '') { return this.createElement('p', html); }
+        createSpan(html = '') { return this.createElement('span', html); }
+        createImg(src, alt = '') {
+            const img = this.createElement('img');
+            img.attribute('src', src).attribute('alt', alt);
+            return img;
+        }
+        createA(href, html = '') {
+            const a = this.createElement('a', html);
+            a.attribute('href', href);
+            return a;
+        }
+        createSlider(min, max, value, step) {
+            const slider = this.createElement('input');
+            slider.attribute('type', 'range')
+                .attribute('min', min)
+                .attribute('max', max)
+                .attribute('value', value)
+                .attribute('step', step);
+            return slider;
+        }
+        createButton(label, callback) {
+            const button = this.createElement('button', label);
+            button.on('click', callback);
+            return button;
+        }
+        createCheckbox(label, checked) {
+            const checkbox = this.createElement('input');
+            checkbox.attribute('type', 'checkbox').checked(checked);
+            const labelEl = this.createElement('label', label);
+            labelEl.element.appendChild(checkbox.element);
+            return checkbox;
+        }
+        createSelect(options) {
+            const select = this.createElement('select');
+            options.forEach(option => {
+                const opt = document.createElement('option');
+                opt.value = option;
+                opt.innerHTML = option;
+                select.element.appendChild(opt);
+            });
+            return select;
+        }
+        createRadio(name, options) {
+            const radioGroup = this.createElement('div');
+            options.forEach(option => {
+                const radio = document.createElement('input');
+                radio.type = 'radio';
+                radio.name = name;
+                radio.value = option;
+                const label = document.createElement('label');
+                label.innerHTML = option;
+                label.appendChild(radio);
+                radioGroup.element.appendChild(label);
+            });
+            return radioGroup;
+        }
+        createColorPicker(value = '#000000') {
+            const colorPicker = this.createElement('input');
+            colorPicker.attribute('type', 'color').attribute('value', value);
+            return colorPicker;
+        }
+        createInput(value = '', type = 'text') {
+            const input = this.createElement('input');
+            input.attribute('type', type).attribute('value', value);
+            return input;
+        }
+        createFileInput(callback) {
+            const fileInput = this.createElement('input');
+            fileInput.attribute('type', 'file').on('change', callback);
+            return fileInput;
+        }
+        createVideo(src) {
+            const video = this.createElement('video');
+            video.attribute('src', src).attribute('controls', true);
+            return video;
+        }
+        createAudio(src) {
+            const audio = this.createElement('audio');
+            audio.attribute('src', src).attribute('controls', true);
+            return audio;
+        }
+        createCapture() {
+            const capture = this.createElement('video');
+            navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+                capture.element.srcObject = stream;
+                capture.element.play();
+            });
+            return capture;
+        }
+    }
+
+    const dom = new T5Dom();
+
+    $.select = (selector) => dom.select(selector);
+    $.selectAll = (selector) => dom.selectAll(selector);
+    $.removeElements = () => dom.removeElements();
+    $.createDiv = (html) => dom.createDiv(html);
+    $.createP = (html) => dom.createP(html);
+    $.createSpan = (html) => dom.createSpan(html);
+    $.createImg = (src, alt) => dom.createImg(src, alt);
+    $.createA = (href, html) => dom.createA(href, html);
+    $.createSlider = (min, max, value, step) => dom.createSlider(min, max, value, step);
+    $.createButton = (label, callback) => dom.createButton(label, callback);
+    $.createCheckbox = (label, checked) => dom.createCheckbox(label, checked);
+    $.createSelect = (options) => dom.createSelect(options);
+    $.createRadio = (name, options) => dom.createRadio(name, options);
+    $.createColorPicker = (value) => dom.createColorPicker(value);
+    $.createInput = (value, type) => dom.createInput(value, type);
+    $.createFileInput = (callback) => dom.createFileInput(callback);
+    $.createVideo = (src) => dom.createVideo(src);
+    $.createAudio = (src) => dom.createAudio(src);
+    $.createCapture = () => dom.createCapture();
+
+    if ($._isGlobal) {
+        globalScope.select = $.select;
+        globalScope.selectAll = $.selectAll;
+        globalScope.removeElements = $.removeElements;
+        globalScope.createDiv = $.createDiv;
+        globalScope.createP = $.createP;
+        globalScope.createSpan = $.createSpan;
+        globalScope.createImg = $.createImg;
+        globalScope.createA = $.createA;
+        globalScope.createSlider = $.createSlider;
+        globalScope.createButton = $.createButton;
+        globalScope.createCheckbox = $.createCheckbox;
+        globalScope.createSelect = $.createSelect;
+        globalScope.createRadio = $.createRadio;
+        globalScope.createColorPicker = $.createColorPicker;
+        globalScope.createInput = $.createInput;
+        globalScope.createFileInput = $.createFileInput;
+        globalScope.createVideo = $.createVideo;
+        globalScope.createAudio = $.createAudio;
+        globalScope.createCapture = $.createCapture;
+    }
+};
+
+// Integrate the dom add-on
+T5.addOns.dom(T5.prototype, T5.prototype, window);
+//************************************************************************//
+//*******************************-T5Input-********************************//
+//************************************************************************//
+T5.addOns.input = ($, p, globalScope) => {
+    globalScope = $
+    $.defineConstant('UP_ARROW', 38);
+    $.defineConstant('DOWN_ARROW', 40);
+    $.defineConstant('LEFT_ARROW', 37);
+    $.defineConstant('RIGHT_ARROW', 39);
+    $.defineConstant('SHIFT', 16);
+    $.defineConstant('TAB', 9);
+    $.defineConstant('BACKSPACE', 8);
+    $.defineConstant('ENTER', 13);
+    $.defineConstant('RETURN', 13);
+    $.defineConstant('ALT', 18);
+    $.defineConstant('OPTION', 18);
+    $.defineConstant('CONTROL', 17);
+    $.defineConstant('DELETE', 46);
+    $.defineConstant('ESCAPE', 27);
+
+    $.defineConstant('ARROW', 'default');
+    $.defineConstant('CROSS', 'crosshair');
+    $.defineConstant('HAND', 'pointer');
+    $.defineConstant('MOVE', 'move');
+    $.defineConstant('TEXT', 'text');
+
+    class T5Input {
+        constructor() {
+            this.keysPressed = new Set();
+            this.keyIsPressed = false;
+            this.key = '';
+            this.keyCode = 0;
+            this.mouseButton = '';
+            this.mouseIsPressed = false;
+            this.movedX = 0;
+            this.movedY = 0;
+            this._mouseX = 0;
+            this._mouseY = 0;
+            this._pmouseX = 0;
+            this._pmouseY = 0;
+            this._winMouseX = 0;
+            this._winMouseY = 0;
+            this._pwinMouseX = 0;
+            this._pwinMouseY = 0;
+            // this._initEventListeners();
+        }
+
+        _initEventListeners() {
+            if (!$.initEventListenersActive) {
+                $.initEventListenersActive = true
+                document.addEventListener('keydown', (e) => this._keyPressed(e));
+                document.addEventListener('keyup', (e) => this._keyReleased(e));
+                document.addEventListener('keypress', (e) => this._keyTyped(e));
+                document.addEventListener('mousemove', (e) => this._onmousemove(e));
+                document.addEventListener('mousedown', (e) => this._onmousedown(e));
+                document.addEventListener('mouseup', (e) => this._onmouseup(e));
+                document.addEventListener('click', (e) => this._onclick(e));
+                document.addEventListener('dblclick', (e) => this._doubleClicked(e));
+                document.addEventListener('wheel', (e) => this._mouseWheel(e));
+            }
+        }
+
+        _keyPressed(e) {
+            this.keysPressed.add(e.keyCode);
+            this.keyIsPressed = true;
+            this.key = e.key;
+            this.keyCode = e.keyCode;
+            if (typeof window.keyPressed === 'function') {
+                window.keyPressed(e);
+            }
+        }
+
+        _keyReleased(e) {
+            this.keysPressed.delete(e.keyCode);
+            this.keyIsPressed = this.keysPressed.size > 0;
+            this.key = e.key;
+            this.keyCode = e.keyCode;
+
+            if (typeof window.keyReleased === 'function') {
+                window.keyReleased(e);
+            }
+        }
+
+        _keyTyped(e) {
+            if (typeof window.keyTyped === 'function') {
+                window.keyTyped(e);
+            }
+        }
+
+        _onmousemove(e) {
+            this._updateMouse(e);
+            if (this.mouseIsPressed) {
+                if (typeof window.mouseDragged === 'function') {
+                    window.mouseDragged(e);
+                }
+            } else {
+                if (typeof window.mouseMoved === 'function') {
+                    window.mouseMoved(e);
+                }
+            }
+        }
+
+        _onmousedown(e) {
+            this._updateMouse(e);
+            this.mouseIsPressed = true;
+            this.mouseButton = ['left', 'middle', 'right'][e.button];
+            if (typeof window.mousePressed === 'function') {
+                window.mousePressed(e);
+            }
+        }
+
+        _onmouseup(e) {
+            this._updateMouse(e);
+            this.mouseIsPressed = false;
+            if (typeof window.mouseReleased === 'function') {
+                window.mouseReleased(e);
+            }
+        }
+
+        _onclick(e) {
+            this._updateMouse(e);
+            this.mouseIsPressed = true;
+            if (typeof window.mouseClicked === 'function') {
+                window.mouseClicked(e);
+            }
+            this.mouseIsPressed = false;
+        }
+
+        _doubleClicked(e) {
+            if (typeof window.doubleClicked === 'function') {
+                window.doubleClicked(e);
+            }
+        }
+
+        _mouseWheel(e) {
+            if (typeof window.mouseWheel === 'function') {
+                window.mouseWheel(e);
+            }
+        }
+
+        _calculateCanvasMetrics() {
+            if (!$) { return }
+            const { canvas } = $;
+            if (!canvas) { return }
+            const rect = canvas.getBoundingClientRect();
+            const aspectRatioCanvas = canvas.width / canvas.height;
+            const aspectRatioRect = rect.width / rect.height;
+
+            const isCanvasWider = aspectRatioCanvas > aspectRatioRect;
+            const displayedWidth = isCanvasWider ? rect.width : rect.height * aspectRatioCanvas;
+            const displayedHeight = isCanvasWider ? rect.width / aspectRatioCanvas : rect.height;
+
+            this.canvasMetrics = {
+                offsetX: (rect.width - displayedWidth) / 2,
+                offsetY: (rect.height - displayedHeight) / 2,
+                scaleX: canvas.width / displayedWidth,
+                scaleY: canvas.height / displayedHeight,
+                rect,
+                width: window.innerWidth,
+                height: window.innerHeight
+            };
+        }
+
+        _updateMouse(e) {
+            if (e.changedTouches) return;
+
+            const { canvasMetrics } = this;
+            if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
+                this._calculateCanvasMetrics();
+            }
+            if (!this.canvasMetrics) { return }
+            const { offsetX, offsetY, scaleX, scaleY, rect } = this.canvasMetrics;
+            const scrollX = window.scrollX || window.pageXOffset;
+            const scrollY = window.scrollY || window.pageYOffset;
+
+            this._pmouseX = this._mouseX;
+            this._pmouseY = this._mouseY;
+            this._mouseX = (e.clientX - rect.left - offsetX + scrollX) * scaleX;
+            this._mouseY = (e.clientY - rect.top - offsetY + scrollY) * scaleY;
+            this._pwinMouseX = this._winMouseX;
+            this._pwinMouseY = this._winMouseY;
+            this._winMouseX = e.clientX + scrollX;
+            this._winMouseY = e.clientY + scrollY;
+        }
+
+        keyIsDown(keyCode) {
+            return this.keysPressed.has(keyCode);
+        }
+
+        requestPointerLock() {
+            if ($.canvas) {
+                $.canvas.requestPointerLock();
+            }
+        }
+
+        exitPointerLock() {
+            document.exitPointerLock();
+        }
+
+        cursor(type = 'default', x = 0, y = 0) {
+            const canvas = $.canvas;
+            const types = {
+                ARROW: 'default',
+                CROSS: 'crosshair',
+                HAND: 'pointer',
+                MOVE: 'move',
+                TEXT: 'text',
+                WAIT: 'wait'
+            };
+
+            if (types[type]) {
+                canvas.style.cursor = types[type];
+            } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
+                canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
+            } else {
+                canvas.style.cursor = type;
+            }
+        }
+
+        noCursor() {
+            const canvas = $.canvas;
+            canvas.style.cursor = 'none';
+        }
+
+        get mouseX() {
+            return $.scaleT5Mouse(this._mouseX);
+        }
+
+        get mouseY() {
+            return $.scaleT5Mouse(this._mouseY);
+        }
+
+        get pmouseX() {
+            return this._pmouseX;
+        }
+
+        get pmouseY() {
+            return this._pmouseY;
+        }
+
+        get winMouseX() {
+            return $.scaleT5Mouse(this._winMouseX);
+        }
+
+        get winMouseY() {
+            return $.scaleT5Mouse(this._winMouseY);
+        }
+
+        get pwinMouseX() {
+            return this._pwinMouseX;
+        }
+
+        get pwinMouseY() {
+            return this._pwinMouseY;
+        }
+
+    }
+
+    const t5Input = new T5Input();
+    t5Input._initEventListeners();
+
+    const properties = [
+        'mouseX', 'mouseY', 'pmouseX', 'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
+        'mouseButton', 'mouseIsPressed'
+    ];
+
+    properties.forEach(prop => {
+        if (!(prop in window)) {
+            Object.defineProperty(window, prop, {
+                get: function () {
+                    return t5Input[prop];
+                }
+            });
+        }
+    });
+
+    if (!('keyIsPressed' in window)) {
+        Object.defineProperty(window, 'keyIsPressed', {
+            get: function () {
+                return t5Input.keyIsPressed;
+            }
+        });
+    }
+    if (!('key' in window)) {
+        Object.defineProperty(window, 'key', {
+            get: function () {
+                return t5Input.key;
+            }
+        });
+    }
+    if (!('keyCode' in window)) {
+        Object.defineProperty(window, 'keyCode', {
+            get: function () {
+                return t5Input.keyCode;
+            }
+        });
+    }
+    if (!('keyIsDown' in window)) {
+        globalScope.keyIsDown = (code) => t5Input.keyIsDown(code);
+    }
+    if (!('movedX' in window)) {
+        globalScope.movedX = () => t5Input.movedX;
+    }
+    if (!('movedY' in window)) {
+        globalScope.movedY = () => t5Input.movedY;
+    }
+    if (!('requestPointerLock' in window)) {
+        globalScope.requestPointerLock = () => t5Input.requestPointerLock();
+    }
+    if (!('exitPointerLock' in window)) {
+        globalScope.exitPointerLock = () => t5Input.exitPointerLock();
+    }
+    if (!('cursor' in window)) {
+        globalScope.cursor = (type, x, y) => t5Input.cursor(type, x, y);
+    }
+    if (!('noCursor' in window)) {
+        globalScope.noCursor = () => t5Input.noCursor();
+    }
+
+    $.disableContextMenu = function () {
+        if ($.canvas) {
+            $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+        }
+    }
+};
+
+// Integrate the input add-on
+T5.addOns.input(T5.prototype, T5.prototype, window);
+//************************************************************************//
+//*******************************-T5Sound-********************************//
+//************************************************************************//
+T5.addOns.sound = ($, p, globalScope) => {
+    class T5Sound {
+        constructor(baseT5) {
+            this.baseT5 = baseT5;
+            this.sound = null;
+            this.loaded = false;
+            this.looping = false;
+            this.playing = false;
+            this.paused = false;
+            this.volume = 1;
+            this.rate = 1;
+            this.duration = 0;
+        }
+
+        loadSound(path, callback) {
+            window.t5PreloadCount++;
+            const audio = new Audio();
             this.sound = audio;
-            this.loaded = true;
-            this.baseT5.assetsLoadedCount++;
-            this.duration = audio.duration;
-            if (callback) {
-                callback(this);
+            audio.src = path;
+            audio.addEventListener('canplaythrough', () => {
+                this.loaded = true;
+                this.duration = audio.duration;
+                window.t5PreloadDone++;
+                if (callback) {
+                    callback(this);
+                }
+            }, false);
+            audio.addEventListener('error', (e) => {
+                console.error(`Failed to load sound: ${path}`, e);
+                window.t5PreloadDone++;
+                if (callback) {
+                    callback(null);
+                }
+            });
+            audio.addEventListener('ended', () => {
+                this.playing = false;
+            });
+            return this;
+        }
+
+        isLoaded() {
+            return this.loaded;
+        }
+
+        async play() {
+            if (this.loaded && !this.playing) {
+                try {
+                    await this.sound.play();
+                    this.playing = true;
+                    this.paused = false;
+                } catch (e) {
+                    console.error('Error playing sound:', e);
+                }
             }
-        }, false);
-        audio.addEventListener('error', (e) => {
-            console.error(`Failed to load sound: ${path}`, e);
-            this.baseT5.assetsLoadedCount++;
-            if (callback) {
-                callback(null);
+        }
+
+        pause() {
+            if (this.loaded && this.playing) {
+                this.sound.pause();
+                this.playing = false;
+                this.paused = true;
             }
-        });
-        this.baseT5.assetsToLoad++;
+        }
 
-    }
+        stop() {
+            if (this.loaded) {
+                this.sound.pause();
+                this.sound.currentTime = 0;
+                this.playing = false;
+                this.paused = false;
+            }
+        }
 
-    isLoaded() {
-        return this.loaded;
-    }
+        loop() {
+            if (this.loaded) {
+                this.sound.loop = true;
+                this.play();
+                this.looping = true;
+            }
+        }
 
-    play() {
-        if (this.loaded) {
-            this.sound.play();
-            this.playing = true;
-            this.paused = false;
+        setLoop(loop) {
+            if (this.loaded) {
+                this.sound.loop = loop;
+                this.looping = loop;
+            }
+        }
+
+        isLooping() {
+            return this.looping;
+        }
+
+        isPlaying() {
+            return this.playing && !this.sound.paused;
+        }
+
+        isPaused() {
+            return this.paused;
+        }
+
+        setVolume(volume) {
+            if (this.loaded) {
+                this.sound.volume = volume;
+                this.volume = volume;
+            }
+        }
+
+        getVolume() {
+            return this.volume;
+        }
+
+        setRate(rate) {
+            if (this.loaded) {
+                this.sound.playbackRate = rate;
+                this.rate = rate;
+            }
+        }
+
+        getRate() {
+            return this.rate;
+        }
+
+        getDuration() {
+            return this.duration;
+        }
+
+        getCurrentTime() {
+            if (this.loaded) {
+                return this.sound.currentTime;
+            }
+            return 0;
+        }
+
+        jump(time) {
+            if (this.loaded) {
+                this.sound.currentTime = time;
+            }
         }
     }
 
-    pause() {
-        if (this.loaded && this.playing) {
-            this.sound.pause();
-            this.playing = false;
-            this.paused = true;
-        }
-    }
-
-    stop() {
-        if (this.loaded) {
-            this.sound.pause();
-            this.sound.currentTime = 0;
-            this.playing = false;
-            this.paused = false;
-        }
-    }
-
-    loop() {
-        if (this.loaded) {
-            this.sound.loop = true;
-            this.play();
-            this.looping = true;
-        }
-    }
-
-    setLoop(loop) {
-        if (this.loaded) {
-            this.sound.loop = loop;
-            this.looping = loop;
-        }
-    }
-
-    isLooping() {
-        return this.looping;
-    }
-
-    isPlaying() {
-        return this.playing;
-    }
-
-    isPaused() {
-        return this.paused;
-    }
-
-    setVolume(volume) {
-        if (this.loaded) {
-            this.sound.volume = volume;
-            this.volume = volume;
-        }
-    }
-
-    getVolume() {
-        return this.volume;
-    }
-
-    setRate(rate) {
-        if (this.loaded) {
-            this.sound.playbackRate = rate;
-            this.rate = rate;
-        }
-    }
-
-    getRate() {
-        return this.rate;
-    }
-
-    duration() {
-        return this.duration;
-    }
-
-    currentTime() {
-        if (this.loaded) {
-            return this.sound.currentTime;
-        }
-        return 0;
-    }
-
-    jump(time) {
-        if (this.loaded) {
-            this.sound.currentTime = time;
-        }
-    }
-}
-
-function setupT5SoundAliases(baseT5) {
-    window.loadSound = function (path, callback) {
-        const soundFile = new T5Sound(baseT5);
-        soundFile.loadSound(path, callback);
-        return soundFile;
+    $.loadSound = function (path, callback) {
+        const soundFile = new T5Sound($);
+        return soundFile.loadSound(path, callback);
     };
 
-    window.playSound = function (soundFile) {
+    $.playSound = function (soundFile) {
         if (soundFile) {
             soundFile.play();
         }
     };
 
-    window.pauseSound = function (soundFile) {
+    $.pauseSound = function (soundFile) {
         if (soundFile) {
             soundFile.pause();
         }
     };
 
-    window.stopSound = function (soundFile) {
+    $.stopSound = function (soundFile) {
         if (soundFile) {
             soundFile.stop();
         }
     };
 
-    window.loopSound = function (soundFile) {
+    $.loopSound = function (soundFile) {
         if (soundFile) {
             soundFile.loop();
         }
     };
 
-    window.setLoopSound = function (soundFile, loop) {
+    $.setLoopSound = function (soundFile, loop) {
         if (soundFile) {
             soundFile.setLoop(loop);
         }
     };
 
-    window.isLoopingSound = function (soundFile) {
+    $.isLoopingSound = function (soundFile) {
         return soundFile ? soundFile.isLooping() : false;
     };
 
-    window.isPlayingSound = function (soundFile) {
+    $.isPlayingSound = function (soundFile) {
         return soundFile ? soundFile.isPlaying() : false;
     };
 
-    window.isPausedSound = function (soundFile) {
+    $.isPausedSound = function (soundFile) {
         return soundFile ? soundFile.isPaused() : false;
     };
 
-    window.setVolumeSound = function (soundFile, volume) {
+    $.setVolumeSound = function (soundFile, volume) {
         if (soundFile) {
             soundFile.setVolume(volume);
         }
     };
 
-    window.getVolumeSound = function (soundFile) {
+    $.getVolumeSound = function (soundFile) {
         return soundFile ? soundFile.getVolume() : 0;
     };
 
-    window.setRateSound = function (soundFile, rate) {
+    $.setRateSound = function (soundFile, rate) {
         if (soundFile) {
             soundFile.setRate(rate);
         }
     };
 
-    window.getRateSound = function (soundFile) {
+    $.getRateSound = function (soundFile) {
         return soundFile ? soundFile.getRate() : 0;
     };
 
-    window.getDurationSound = function (soundFile) {
-        return soundFile ? soundFile.duration() : 0;
+    $.getDurationSound = function (soundFile) {
+        return soundFile ? soundFile.getDuration() : 0;
     };
 
-    window.getCurrentTimeSound = function (soundFile) {
-        return soundFile ? soundFile.currentTime() : 0;
+    $.getCurrentTimeSound = function (soundFile) {
+        return soundFile ? soundFile.getCurrentTime() : 0;
     };
 
-    window.jumpSound = function (soundFile, time) {
+    $.jumpSound = function (soundFile, time) {
         if (soundFile) {
             soundFile.jump(time);
         }
     };
-}
 
-setupT5SoundAliases(myT5);
+    if ($._isGlobal) {
+        globalScope.loadSound = $.loadSound;
+        globalScope.playSound = $.playSound;
+        globalScope.pauseSound = $.pauseSound;
+        globalScope.stopSound = $.stopSound;
+        globalScope.loopSound = $.loopSound;
+        globalScope.setLoopSound = $.setLoopSound;
+        globalScope.isLoopingSound = $.isLoopingSound;
+        globalScope.isPlayingSound = $.isPlayingSound;
+        globalScope.isPausedSound = $.isPausedSound;
+        globalScope.setVolumeSound = $.setVolumeSound;
+        globalScope.getVolumeSound = $.getVolumeSound;
+        globalScope.setRateSound = $.setRateSound;
+        globalScope.getRateSound = $.getRateSound;
+        globalScope.getDurationSound = $.getDurationSound;
+        globalScope.getCurrentTimeSound = $.getCurrentTimeSound;
+        globalScope.jumpSound = $.jumpSound;
+    }
+};
+
+// Integrate the sound add-on
+T5.addOns.sound(T5.prototype, T5.prototype, window);
 
 //************************************************************************//
-//********************************-T5Draw-********************************//
+//********************************-T5Art-*********************************//
 //************************************************************************//
+T5.addOns.art = ($, p) => {
+    $.defineConstant('LINEAR', 'linear');
+    $.defineConstant('RADIAL', 'radial');
 
-class T5Draw {
-    constructor(t5Instance) {
-        this.t5 = t5Instance;
-    }
-
-    noiseLine(x1, y1, x2, y2, noiseScale = 0.1, noiseStrength = 10) {
-        const distance = dist(x1, y1, x2, y2);
-        const steps = Math.ceil(distance / 5);
-        const linePoints = [];
-        let noiseOffset = 0;
-        const angle = atan2(y2 - y1, x2 - x1);
-
-        for (let i = 0; i <= steps; i++) {
-            const t = i / steps;
-            const x = lerp(x1, x2, t);
-            const y = lerp(y1, y2, t);
-            const noiseValue = noise(noiseOffset);
-            const offset = (noiseValue - 0.5) * noiseStrength;
-            const offsetX = cos(angle + HALF_PI) * offset;
-            const offsetY = sin(angle + HALF_PI) * offset;
-
-            linePoints.push({ x: x + offsetX, y: y + offsetY });
-            noiseOffset += noiseScale;
-        }
-
-        this.t5.beginShape();
-        linePoints.forEach(point => this.t5.vertex(point.x, point.y));
-        this.t5.endShape(false);
-    }
-
-    noiseEllipse(x, y, width, height, noiseScale = 0.1, noiseStrength = 10) {
-        const ellipsePoints = [];
-        const step = TWO_PI / 50;
-        let noiseOffset = 0;
-
-        for (let angle = 0; angle < TWO_PI; angle += step) {
-            const px = cos(angle) * width / 2;
-            const py = sin(angle) * height / 2;
-
-            const noiseValueX = noise(noiseOffset);
-            const noiseValueY = noise(noiseOffset + 1000);
-            const offsetX = (noiseValueX - 0.5) * noiseStrength;
-            const offsetY = (noiseValueY - 0.5) * noiseStrength;
-
-            ellipsePoints.push({ x: x + px + offsetX, y: y + py + offsetY });
-            noiseOffset += noiseScale;
-        }
-        const firstPoint = ellipsePoints[0];
-        ellipsePoints.push({ x: firstPoint.x, y: firstPoint.y });
-        this.t5.beginShape();
-        ellipsePoints.forEach(point => this.t5.vertex(point.x, point.y));
-        this.t5.endShape(true);
-    }
-
-    noiseRect(x, y, width, height, noiseScale = 0.1, noiseStrength = 10) {
-        const rectPoints = [];
-        let noiseOffsetX = 0;
-        let noiseOffsetY = 1000;
-        const step = 5;
-
-        const addNoisePoint = (px, py, scale) => {
-            const noiseValueX = noise(noiseOffsetX);
-            const noiseValueY = noise(noiseOffsetY);
-            const offsetX = (noiseValueX - 0.5) * noiseStrength * scale;
-            const offsetY = (noiseValueY - 0.5) * noiseStrength * scale;
-            rectPoints.push({ x: px + offsetX, y: py + offsetY });
-            noiseOffsetX += noiseScale;
-            noiseOffsetY += noiseScale;
-        };
-
-        // Top edge
-        for (let i = 0; i <= width; i += step) {
-            const scale = 1 - Math.abs(i / width - 0.5) * 2;
-            addNoisePoint(x + i, y, scale);
-        }
-
-        // Right edge
-        for (let i = 0; i <= height; i += step) {
-            const scale = 1 - Math.abs(i / height - 0.5) * 2;
-            addNoisePoint(x + width, y + i, scale);
-        }
-
-        // Bottom edge
-        for (let i = width; i >= 0; i -= step) {
-            const scale = 1 - Math.abs(i / width - 0.5) * 2;
-            addNoisePoint(x + i, y + height, scale);
-        }
-
-        // Left edge
-        for (let i = height; i >= 0; i -= step) {
-            const scale = 1 - Math.abs(i / height - 0.5) * 2;
-            addNoisePoint(x, y + i, scale);
-        }
-
-        // Close the shape by connecting to the first point
-        rectPoints.push(rectPoints[0]);
-
-        this.t5.beginShape();
-        rectPoints.forEach(point => this.t5.vertex(point.x, point.y));
-        this.t5.endShape(true);
-    }
-
-    gradientFill(color1, color2, x, y, x2, y2) {
-        const ctx = this.t5.context;
-        const gradient = ctx.createLinearGradient(
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            this.t5._scaleCoordinate(x2),
-            this.t5._scaleCoordinate(y2)
-        );
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        this.t5.fillStyle = gradient;
-    }
-
-    gradientStroke(color1, color2, x, y, x2, y2) {
-        const ctx = this.t5.context;
-        const gradient = ctx.createLinearGradient(
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            this.t5._scaleCoordinate(x2),
-            this.t5._scaleCoordinate(y2)
-        );
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        this.t5.strokeStyle = gradient;
-    }
-
-    radialFill(color1, color2, x, y, radius) {
-        const ctx = this.t5.context;
-        const gradient = ctx.createRadialGradient(
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            0,
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            this.t5._scaleCoordinate(radius)
-        );
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        this.t5.fillStyle = gradient;
-    }
-
-    radialStroke(color1, color2, x, y, radius) {
-        const ctx = this.t5.context;
-        const gradient = ctx.createRadialGradient(
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            0,
-            this.t5._scaleCoordinate(x),
-            this.t5._scaleCoordinate(y),
-            this.t5._scaleCoordinate(radius)
-        );
-        gradient.addColorStop(0, color1);
-        gradient.addColorStop(1, color2);
-        this.t5.strokeStyle = gradient;
-    }
-
-    dynamicGradient(type, colorStops, x1, y1, x2, y2, r1 = 0, r2 = 0) {
-        const ctx = this.t5.context;
+    function createT5Gradient(type, config) {
         let gradient;
+        let startX, startY, endX, endY, radius;
 
-        if (type === 'linear') {
-            gradient = ctx.createLinearGradient(
-                this.t5._scaleCoordinate(x1),
-                this.t5._scaleCoordinate(y1),
-                this.t5._scaleCoordinate(x2),
-                this.t5._scaleCoordinate(y2)
-            );
-        } else if (type === 'radial') {
-            gradient = ctx.createRadialGradient(
-                this.t5._scaleCoordinate(x1),
-                this.t5._scaleCoordinate(y1),
-                0,
-                this.t5._scaleCoordinate(x1),
-                this.t5._scaleCoordinate(y1),
-                this.t5._scaleCoordinate(x2)
-            );
+        // Extract coordinates and radius based on the gradient type
+        if (type === $.LINEAR) {
+            ({ startX, startY, endX, endY } = config[0]);
+            [startX, startY, endX, endY] = $.scaleT5Coords([startX, startY, endX, endY]);
+
+            gradient = $.context.createLinearGradient(startX, startY, endX, endY);
+        } else if (type === $.RADIAL) {
+            ({ startX, startY, radius } = config[0]);
+            [startX, startY, radius] = $.scaleT5Coords([startX, startY, radius]);
+
+            gradient = $.context.createRadialGradient(startX, startY, 0, startX, startY, radius);
         } else {
-            throw new Error('Unsupported gradient type');
+            throw new Error('Invalid gradient type');
         }
 
-        colorStops.forEach(stop => {
-            gradient.addColorStop(stop.offset, stop.color);
-        });
+        // Add color stops
+        for (let i = 1; i < config.length; i++) {
+            const { colorStop, color } = config[i];
+            const parsedColor = $.color(color);
+            gradient.addColorStop(colorStop, parsedColor.toString());
+        }
 
         return gradient;
     }
 
-    dynamicFill(type, colorStops, x1, y1, x2, y2, r1 = 0, r2 = 0) {
-        const gradient = this.dynamicGradient(type, colorStops, x1, y1, x2, y2, r1, r2);
-        this.t5.fillStyle = gradient;
+    $.gradientFill = function (type, config) {
+        const gradient = createT5Gradient(type, config);
+        $.context.fillStyle = gradient;
+    };
+
+    $.gradientStroke = function (type, config) {
+        const gradient = createT5Gradient(type, config);
+        $.context.strokeStyle = gradient;
+    };
+    $.gradientBackground = function (type, config) {
+        const gradient = createT5Gradient(type, config);
+        $.context.save();
+        $.context.fillStyle = gradient;
+        $.context.fillRect(0, 0, $.canvas.width, $.canvas.height);
+        $.context.restore();
+    };
+
+
+    $.noiseLine = function (x1, y1, x2, y2, noiseScale = 0.05, noiseStrength = 35) {
+        const distance = $.dist(x1, y1, x2, y2);
+        const steps = Math.ceil(distance / 5);
+        const linePoints = [];
+        const angle = Math.atan2(y2 - y1, x2 - x1);
+        const cosAngleHalfPi = Math.cos(angle + $.HALF_PI);
+        const sinAngleHalfPi = Math.sin(angle + $.HALF_PI);
+
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps;
+            const x = $.lerp(x1, x2, t);
+            const y = $.lerp(y1, y2, t);
+            const noiseValue = $.noise(i * noiseScale);
+            const offset = (noiseValue - 0.5) * noiseStrength;
+            const offsetX = cosAngleHalfPi * offset;
+            const offsetY = sinAngleHalfPi * offset;
+
+            linePoints.push({ x: x + offsetX, y: y + offsetY });
+        }
+
+        $.beginShape();
+        linePoints.forEach(point => $.vertex(point.x, point.y));
+        $.endShape();
+    };
+
+    $.noiseEllipse = function (cx, cy, radius, noiseScale = 0.1, noiseStrength = 30, steps = 50) {
+        const angleIncrement = $.TWO_PI / steps;
+        const ellipsePoints = [];
+
+        for (let i = 0; i <= steps; i++) {
+            const angle = i * angleIncrement;
+            const noiseValue = $.noise(i * noiseScale);
+            const offset = (noiseValue - 0.5) * noiseStrength;
+            const currentRadius = radius + offset;
+            const x = cx + Math.cos(angle) * currentRadius;
+            const y = cy + Math.sin(angle) * currentRadius;
+
+            ellipsePoints.push({ x: x, y: y });
+        }
+
+        $.beginShape();
+        ellipsePoints.forEach(point => $.vertex(point.x, point.y));
+        $.endShape(CLOSE);
+    };
+
+    $.noiseRect = function (x, y, width, height = width, noiseScale = 0.1, noiseStrength = 35) {
+        const addNoiseLinePoints = (x1, y1, x2, y2, points) => {
+            const distance = $.dist(x1, y1, x2, y2);
+            const steps = Math.ceil(distance / 5);
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            const cosAngleHalfPi = Math.cos(angle + $.HALF_PI);
+            const sinAngleHalfPi = Math.sin(angle + $.HALF_PI);
+
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const x = $.lerp(x1, x2, t);
+                const y = $.lerp(y1, y2, t);
+                const noiseValue = $.noise(i * noiseScale);
+                const offset = (noiseValue - 0.5) * noiseStrength;
+                const offsetX = cosAngleHalfPi * offset;
+                const offsetY = sinAngleHalfPi * offset;
+
+                points.push({ x: x + offsetX, y: y + offsetY });
+            }
+        };
+
+        const rectPoints = [];
+
+        addNoiseLinePoints(x, y, x + width, y, rectPoints);
+        addNoiseLinePoints(x + width, y, x + width, y + height, rectPoints);
+        addNoiseLinePoints(x + width, y + height, x, y + height, rectPoints);
+        addNoiseLinePoints(x, y + height, x, y, rectPoints);
+
+        $.beginShape();
+        rectPoints.forEach(point => $.vertex(point.x, point.y));
+        $.endShape(CLOSE);
+    };
+
+
+    $.polygon = function (x, y, radius, verts) {
+        const angleOffset = -Math.PI / 2;
+        const angleIncrement = (2 * Math.PI) / verts;
+        $.beginShape();
+        for (let i = 0; i < verts; i++) {
+            const angle = i * angleIncrement + angleOffset;
+            const vx = x + Math.cos(angle) * radius;
+            const vy = y + Math.sin(angle) * radius;
+            $.vertex(vx, vy);
+        }
+        $.endShape(true);
     }
 
-    dynamicStroke(type, colorStops, x1, y1, x2, y2, r1 = 0, r2 = 0) {
-        const gradient = this.dynamicGradient(type, colorStops, x1, y1, x2, y2, r1, r2);
-        this.t5.strokeStyle = gradient;
+    $.star = function (x, y, radius1, radius2, points) {
+        const angleOffset = -Math.PI / 2;
+        const angleIncrement = (2 * Math.PI) / points;
+        $.beginShape();
+        for (let i = 0; i < points * 2; i++) {
+            const angle = i * angleIncrement / 2 + angleOffset;
+            const radius = (i % 2 === 0) ? radius1 : radius2;
+            const vx = x + Math.cos(angle) * radius;
+            const vy = y + Math.sin(angle) * radius;
+            $.vertex(vx, vy);
+        }
+        $.endShape(true);
+    };
+    $.fillArea = (x, y, ...colorArgs) => {
+        const ctx = $.context, canvas = $.canvas;
+        [x, y] = $.scaleT5Coords([x, y]);
+        [x, y] = [Math.floor(x), Math.floor(y)];
+
+        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+            console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
+            return;
+        }
+
+        const fillColor = handleColorArgument(colorArgs);
+        if (!fillColor) {
+            console.warn('Invalid fill color');
+            return;
+        }
+
+        const colorObj = $.color(fillColor);
+        const fillColorLevels = colorObj.levels;
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const width = canvas.width, height = canvas.height;
+        const targetColor = getColorAt(x, y, data, width);
+        const stack = [[x, y]];
+        const visited = new Uint8Array(width * height);
+
+        while (stack.length) {
+            const [currX, currY] = stack.pop();
+            if (currX < 0 || currX >= width || currY < 0 || currY >= height) continue;
+
+            let startX = currX;
+            while (startX >= 0 && colorsMatch(getColorAt(startX, currY, data, width), targetColor)) startX--;
+            startX++;
+
+            let endX = currX;
+            while (endX < width && colorsMatch(getColorAt(endX, currY, data, width), targetColor)) endX++;
+            endX--;
+
+            for (let i = startX; i <= endX; i++) {
+                const index = currY * width + i;
+                if (!visited[index]) {
+                    setColorAt(i, currY, fillColorLevels, data, width);
+                    visited[index] = 1;
+                    if (currY > 0) stack.push([i, currY - 1]);
+                    if (currY < height - 1) stack.push([i, currY + 1]);
+                }
+            }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+    };
+
+    function getColorAt(x, y, data, width) {
+        const idx = (y * width + x) * 4;
+        return [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]];
     }
-}
 
-const myT5Draw = new T5Draw(myT5);
+    function setColorAt(x, y, color, data, width) {
+        const idx = (y * width + x) * 4;
+        [data[idx], data[idx + 1], data[idx + 2], data[idx + 3]] = color;
+    }
 
-// Aliases for global scope
-const noiseLine = (x, y, x2, y2, noiseScale, noiseStrength) => myT5Draw.noiseLine(x, y, x2, y2, noiseScale, noiseStrength);
-const noiseEllipse = (x, y, width, height, noiseScale, noiseStrength) => myT5Draw.noiseEllipse(x, y, width, height, noiseScale, noiseStrength);
-const noiseRect = (x, y, width, height, noiseScale, noiseStrength) => myT5Draw.noiseRect(x, y, width, height, noiseScale, noiseStrength);
-const gradientFill = (color1, color2, x, y, x2, y2) => myT5Draw.gradientFill(color1, color2, x, y, x2, y2);
-const gradientStroke = (color1, color2, x, y, x2, y2) => myT5Draw.gradientStroke(color1, color2, x, y, x2, y2);
-const radialFill = (color1, color2, x, y, radius) => myT5Draw.radialFill(color1, color2, x, y, radius);
-const radialStroke = (color1, color2, x, y, radius) => myT5Draw.radialStroke(color1, color2, x, y, radius);
-const dynamicGradient = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicGradient(type, colorStops, x1, y1, x2, y2, r1, r2);
-const dynamicFill = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicFill(type, colorStops, x1, y1, x2, y2, r1, r2);
-const dynamicStroke = (type, colorStops, x1, y1, x2, y2, r1, r2) => myT5Draw.dynamicStroke(type, colorStops, x1, y1, x2, y2, r1, r2);
+    function colorsMatch(a, b) {
+        return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+    }
+
+    function handleColorArgument(args) {
+        if (args.length === 1 && $.isColorObject(args[0])) {
+            return args[0].toString();
+        } else {
+            const colorObj = $.color(...args);
+            return colorObj ? colorObj.toString() : null;
+        }
+    }
+
+};
+
+T5.addOns.art(T5.prototype, T5.prototype);
