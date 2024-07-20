@@ -78,7 +78,7 @@ function draw() {
 ```
 ### Custom functions
 
-T5.js handles some funcitonalities different than p5, but almost all p5 drawing functionalities are the same.
+T5.js handles some functionalities different than p5, but almost all p5 drawing functionalities are the same.
 
 There are also some T5.js specific functions such as `borderRadius()`, `noiseEllipse()`,  `gradientFill()`, `polygon()` and more! look in the examples folder to see how some of them work.
 
