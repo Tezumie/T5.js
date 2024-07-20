@@ -1,6 +1,6 @@
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 
-![T5 Logo](t5-logo.PNG)
+![T5 Logo](t5-logo.png)
 
 # T5.js Documentation
 
@@ -8,17 +8,16 @@
 
 T5.js is a lightweight and simplified 2D graphics library designed for drawing on the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity, along with some new functions. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead. 
 
-In addition to T5.js, I'm also a developer on [Q5.js](https://github.com/quinton-ashley/q5.js), a more fully-fledged library that brings some of the unique functionalities from T5.js, such as flexible canvas mode, and all of the 2d canvas functionalities of p5, into a more comprehensive package. Q5.js serves as a robust alternative for those looking for a lightweight yet powerful alternative to p5.js.
-
 T5.js does not use any code from p5.js and is not affiliated with it. p5.js has some functionalities such as WEBGL that T5.js does not yet have. If you're looking for a library with more functionalities, in a larger package, check out [p5.js](https://github.com/processing/p5.js/tree/main).
 
+In addition to T5.js, I'm also a developer on [Q5.js](https://github.com/quinton-ashley/q5.js). Q5.js serves as a robust alternative for those looking for a lightweight yet powerful alternative to p5.js.
 
 ## Features
 - Easy-to-use API similar to p5.js
-- Built-in dimension agnostic option
+- Built-in dimension agnostic option with flexibleCanvas()
 - Optimized for performance
 - Modular design allowing for easy extension and customization
-- custom functions
+- Additional custom functions
   
 
 ## Getting Started
@@ -57,7 +56,7 @@ For production it is recommended to download T5Main.js and use the actual file t
 ```
 You can use `<script src="T5Main.js"></script>` to access all of the available features.
 
-Optionally, you can select which features you want and omit all the others. Individual libraries can be found in the libraries folder.
+Optionally, you can select which features you want and omit all the others. Individual libraries can be found in the T5 folder.
 
 
 ### Basic Setup
@@ -79,15 +78,9 @@ function draw() {
 ```
 ### Custom functions
 
-T5.js handles some funcitonalities different than p5, such as 2d textures with `setTexture()`, `createBuffer()` instead of `createGraphics()`, `borderRadius()` instead of curve vertex, and a few other changes. You can find examples of Most of the main differences being used in the examples folder.
+T5.js handles some funcitonalities different than p5, but almost all p5 drawing functionalities are the same.
 
-There are also some T5.js specific functions such as `fillArea()`, `noiseEllipse()`,  `gradientFill()`, `gradientStroke()` and more! look in the examples folder to see how some of them work.
-
-### Extending T5.js
-
-You can create your own classes and extend the functionality of T5.js.
-
-You can learn how in `docs/CustomClassDocs.md`.
+There are also some T5.js specific functions such as `borderRadius()`, `noiseEllipse()`,  `gradientFill()`, `polygon()` and more! look in the examples folder to see how some of them work.
 
 ### Contributing
 
