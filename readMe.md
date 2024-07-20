@@ -26,7 +26,7 @@ In addition to T5.js, I'm also a developer on [Q5.js](https://github.com/quinton
 
 The quickest way to start using T5.js is with the aijs.io browser-based code editor.
 
-Follow [this link](https://aijs.io/editor?user=aijs&project=T5JS) to open the template in a browser-based code editor. Then, simply press the play button to see your sketch in action.
+Follow [this link](https://aijs.io/editor?user=AIJS&project=t5.js-Template) to open the template in a browser-based code editor. Then, simply press the play button to see your sketch in action.
 
 
 You can Use T5.js via cdn.
