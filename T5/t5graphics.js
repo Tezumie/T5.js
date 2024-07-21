@@ -5,24 +5,17 @@ T5.addOns.createGraphics = ($, p) => {
     class Graphics extends T5 {
         constructor(w, h, parent) {
             super('local', parent);
-            this.canvas = $.createElement('canvas').element;
-            this.canvas.width = w;
-            this.canvas.height = h;
-            this.context = this.canvas.getContext('2d');
-            this.ctx = this.context;
-            this.width = w;
-            this.height = h;
-            this._offscreen = true;
-            this.context.fillStyle = 'rgb(255, 255, 255)';
-            this.context.strokeStyle = 'rgb(0, 0, 0)';
-            this.canvas.style.display = 'none';
-            document.body.appendChild(this.canvas);
-            this.ctx = this.context = this.canvas.getContext('2d');
         }
     }
 
     $.createGraphics = function (w, h) {
-        return new Graphics(w, h, $);
+        let p = new Graphics(w, h, $);
+        p.createCanvas(w, h, 'graphics')
+        p.canvas.style.display = 'none'
+        p.pixelDensity($.t5PixelDensity)
+        p.flexibleCanvas(w)
+
+        return p;
     };
 
     $.Graphics = Graphics;
