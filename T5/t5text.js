@@ -42,6 +42,9 @@ T5.addOns.text = ($, p) => {
 
   // Set text font
   $.textFont = function (font) {
+    if (font instanceof T5Font) {
+      font = font.family;
+    }
     if (font !== undefined) {
       $.textFontVal = font;
       $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
@@ -60,9 +63,6 @@ T5.addOns.text = ($, p) => {
 
   // Set text alignment
   $.textAlign = function (hAlign, vAlign) {
-    // if (vAlign == CENTER) {
-    //   vAlign = 'middle';
-    // }
     if (hAlign !== undefined) {
       $.textAlignH = hAlign;
     }
@@ -152,7 +152,33 @@ T5.addOns.text = ($, p) => {
     if ($.context.strokeStyle) {
       $.context.strokeText(line, x, y);
     }
+  };
 
+  // Font class
+  class T5Font {
+    constructor(font, family) {
+      this.font = font;
+      this.family = family;
+    }
+  }
+
+  // Load font
+  $.loadFont = function (path, callback) {
+    window.t5PreloadCount++;
+    const family = 'CustomFont' + window.t5PreloadCount;
+    const font = new FontFace(family, `url(${path})`);
+    const t5Font = new T5Font(font, family);
+    font.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+      window.t5PreloadDone++;
+      if (callback) {
+        callback(t5Font);
+      }
+    }).catch((error) => {
+      window.t5PreloadDone++;
+      console.error(`Failed to load font at path: ${path}. Error: ${error}`);
+    });
+    return t5Font;
   };
 
 };
