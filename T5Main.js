@@ -255,7 +255,11 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
-        window.drawingContext = p.context;
+        if (renderer != 'graphics') {
+            window.drawingContext = p.context;
+        }
+
+        $.drawingContext = p.context
         window.width = $.width;
         window.height = $.height;
         window.canvasWidth = p.canvas.width;
@@ -462,6 +466,8 @@ T5.addOns.canvas = ($, p) => {
             source = src;
         } else if (src && src.canvas instanceof HTMLCanvasElement) {
             source = src.canvas;
+            sw = sw * $.t5PixelDensity
+            sh = sh * $.t5PixelDensity
         } else {
             source = $.canvas;
         }
@@ -672,24 +678,17 @@ T5.addOns.createGraphics = ($, p) => {
     class Graphics extends T5 {
         constructor(w, h, parent) {
             super('local', parent);
-            this.canvas = $.createElement('canvas').element;
-            this.canvas.width = w;
-            this.canvas.height = h;
-            this.context = this.canvas.getContext('2d');
-            this.ctx = this.context;
-            this.width = w;
-            this.height = h;
-            this._offscreen = true;
-            this.context.fillStyle = 'rgb(255, 255, 255)';
-            this.context.strokeStyle = 'rgb(0, 0, 0)';
-            this.canvas.style.display = 'none';
-            document.body.appendChild(this.canvas);
-            this.ctx = this.context = this.canvas.getContext('2d');
         }
     }
 
     $.createGraphics = function (w, h) {
-        return new Graphics(w, h, $);
+        let p = new Graphics(w, h, $);
+        p.createCanvas(w, h, 'graphics')
+        p.canvas.style.display = 'none'
+        p.pixelDensity($.t5PixelDensity)
+        p.flexibleCanvas(w)
+
+        return p;
     };
 
     $.Graphics = Graphics;
@@ -929,18 +928,18 @@ T5.addOns.colors = ($, p) => {
     $.lerp = function (start, stop, amt) {
         return start + (stop - start) * amt;
     };
+    
+	$.erase = function (fillAlpha = 255, strokeAlpha = 255) {
+		$.context.save();
+		$.context.globalCompositeOperation = 'destination-out';
+		$.context.fillStyle = `rgba(0, 0, 0, ${fillAlpha / 255})`;
+		$.context.strokeStyle = `rgba(0, 0, 0, ${strokeAlpha / 255})`;
+	};
 
-    $.erase = function (fillAlpha = 255, strokeAlpha = 255) {
-        $.context.save();
-        $.context.globalCompositeOperation = 'destination-out';
-        $.context.fillStyle = `rgba(0, 0, 0, ${fillAlpha / 255})`;
-        $.context.strokeStyle = `rgba(0, 0, 0, ${strokeAlpha / 255})`;
-    };
-
-    $.noErase = function () {
-        $.context.globalCompositeOperation = 'source-over';
-        $.context.restore();
-    };
+	$.noErase = function () {
+		$.context.globalCompositeOperation = 'source-over';
+		$.context.restore();
+	};
 };
 
 T5.addOns.colors(T5.prototype, T5.prototype);
@@ -1046,7 +1045,9 @@ T5.addOns.image = ($, p) => {
         } else {
             $.context.drawImage(source, x, y, width, height);
         }
+        return img;
     };
+
 };
 
 T5.addOns.image(T5.prototype, T5.prototype);
@@ -1874,158 +1875,158 @@ T5.addOns.math(T5.prototype, T5.prototype);
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-    // Constants
-    $.defineConstant('NORMAL', 'normal');
-    $.defineConstant('ITALIC', 'italic');
-    $.defineConstant('BOLD', 'bold');
-    $.defineConstant('BOLDITALIC', 'italic bold');
-    $.defineConstant('CENTER', 'center');
-    $.defineConstant('MIDDLE', 'middle');
-    $.defineConstant('LEFT', 'left');
-    $.defineConstant('RIGHT', 'right');
-    $.defineConstant('TOP', 'top');
-    $.defineConstant('BOTTOM', 'bottom');
-    $.defineConstant('BASELINE', 'alphabetic');
-    $.defineConstant('WORD', 'word');
-    $.defineConstant('CHAR', 'char');
-    $.defineConstant('WRAP', 'wrap');
-    $.defineConstant('NOWRAP', 'nowrap');
+  // Constants
+  $.defineConstant('NORMAL', 'normal');
+  $.defineConstant('ITALIC', 'italic');
+  $.defineConstant('BOLD', 'bold');
+  $.defineConstant('BOLDITALIC', 'italic bold');
+  $.defineConstant('CENTER', 'center');
+  $.defineConstant('MIDDLE', 'middle');
+  $.defineConstant('LEFT', 'left');
+  $.defineConstant('RIGHT', 'right');
+  $.defineConstant('TOP', 'top');
+  $.defineConstant('BOTTOM', 'bottom');
+  $.defineConstant('BASELINE', 'alphabetic');
+  $.defineConstant('WORD', 'word');
+  $.defineConstant('CHAR', 'char');
+  $.defineConstant('WRAP', 'wrap');
+  $.defineConstant('NOWRAP', 'nowrap');
 
-    // Default text properties
-    $.textSizeVal = 12;
-    $.textAlignH = 'left';
-    $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
-    $.textLeadingVal = $.textSizeVal * 1.2;
-    $.textFontVal = 'sans-serif';
-    $.textStyleVal = 'normal';
-    $.textWrapVal = 'wrap';
-    $.textFillColor = '#000000';
-    $.textStrokeColor = '#000000';
+  // Default text properties
+  $.textSizeVal = 12;
+  $.textAlignH = 'left';
+  $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
+  $.textLeadingVal = $.textSizeVal * 1.2;
+  $.textFontVal = 'sans-serif';
+  $.textStyleVal = 'normal';
+  $.textWrapVal = 'wrap';
+  $.textFillColor = '#000000';
+  $.textStrokeColor = '#000000';
 
-    // Set text size
-    $.textSize = function (size) {
-        [size] = $.scaleT5Coords([size]);
-        if (size !== undefined) {
-            $.textSizeVal = size;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textSizeVal;
-    };
+  // Set text size
+  $.textSize = function (size) {
+    [size] = $.scaleT5Coords([size]);
+    if (size !== undefined) {
+      $.textSizeVal = size;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textSizeVal;
+  };
 
-    // Set text font
-    $.textFont = function (font) {
-        if (font !== undefined) {
-            $.textFontVal = font;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textFontVal;
-    };
+  // Set text font
+  $.textFont = function (font) {
+    if (font !== undefined) {
+      $.textFontVal = font;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textFontVal;
+  };
 
-    // Set text style (normal, bold, italic)
-    $.textStyle = function (style) {
-        if (style !== undefined) {
-            $.textStyleVal = style;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textStyleVal;
-    };
+  // Set text style (normal, bold, italic)
+  $.textStyle = function (style) {
+    if (style !== undefined) {
+      $.textStyleVal = style;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textStyleVal;
+  };
 
-    // Set text alignment
-    $.textAlign = function (hAlign, vAlign) {
-        // if (vAlign == CENTER) {
-        //   vAlign = 'middle';
-        // }
-        if (hAlign !== undefined) {
-            $.textAlignH = hAlign;
-        }
-        if (vAlign !== undefined) {
-            $.textAlignV = vAlign;
-        }
-        $.context.textAlign = $.textAlignH;
-        $.context.textBaseline = $.textAlignV;
-    };
+  // Set text alignment
+  $.textAlign = function (hAlign, vAlign) {
+    // if (vAlign == CENTER) {
+    //   vAlign = 'middle';
+    // }
+    if (hAlign !== undefined) {
+      $.textAlignH = hAlign;
+    }
+    if (vAlign !== undefined) {
+      $.textAlignV = vAlign;
+    }
+    $.context.textAlign = $.textAlignH;
+    $.context.textBaseline = $.textAlignV;
+  };
 
-    // Set text leading (line height)
-    $.textLeading = function (leading) {
-        [leading] = $.scaleT5Coords([leading]);
-        if (leading !== undefined) {
-            $.textLeadingVal = leading;
-        }
-        return $.textLeadingVal;
-    };
+  // Set text leading (line height)
+  $.textLeading = function (leading) {
+    [leading] = $.scaleT5Coords([leading]);
+    if (leading !== undefined) {
+      $.textLeadingVal = leading;
+    }
+    return $.textLeadingVal;
+  };
 
-    // Set text wrap
-    $.textWrap = function (wrapType) {
-        if (wrapType !== undefined) {
-            $.textWrapVal = wrapType;
-        }
-        return $.textWrapVal;
-    };
+  // Set text wrap
+  $.textWrap = function (wrapType) {
+    if (wrapType !== undefined) {
+      $.textWrapVal = wrapType;
+    }
+    return $.textWrapVal;
+  };
 
-    // Measure text width
-    $.textWidth = function (str) {
-        return $.context.measureText(str).width;
-    };
+  // Measure text width
+  $.textWidth = function (str) {
+    return $.context.measureText(str).width;
+  };
 
-    // Measure text ascent
-    $.textAscent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("M").actualBoundingBoxAscent;
-    };
+  // Measure text ascent
+  $.textAscent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("M").actualBoundingBoxAscent;
+  };
 
-    // Measure text descent
-    $.textDescent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("g").actualBoundingBoxDescent;
-    };
+  // Measure text descent
+  $.textDescent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("g").actualBoundingBoxDescent;
+  };
 
-    // Draw text
-    $.text = function (str, x, y, maxWidth) {
-        [x, y] = $.scaleT5Coords([x, y]);
-        const lines = str.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
-                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
-            } else {
-                if ($.context.fillStyle) {
-                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-                }
-                if ($.context.strokeStyle) {
-                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
-                }
-            }
-        }
-    };
-
-    // Draw wrapped text
-    $.drawWrappedText = function (text, x, y, maxWidth) {
-        let words = text.split(' ');
-        let line = '';
-        for (let i = 0; i < words.length; i++) {
-            let testLine = line + words[i] + ' ';
-            let metrics = $.context.measureText(testLine);
-            let testWidth = metrics.width;
-            if (testWidth > maxWidth && i > 0) {
-                if ($.context.fillStyle) {
-                    $.context.fillText(line, x, y);
-                }
-                if ($.context.strokeStyle) {
-                    $.context.strokeText(line, x, y);
-                }
-                line = words[i] + ' ';
-                y += $.textLeadingVal;
-            } else {
-                line = testLine;
-            }
-        }
+  // Draw text
+  $.text = function (str, x, y, maxWidth) {
+    [x, y] = $.scaleT5Coords([x, y]);
+    const lines = str.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+        $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+      } else {
         if ($.context.fillStyle) {
-            $.context.fillText(line, x, y);
+          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
         }
         if ($.context.strokeStyle) {
-            $.context.strokeText(line, x, y);
+          $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
         }
+      }
+    }
+  };
 
-    };
+  // Draw wrapped text
+  $.drawWrappedText = function (text, x, y, maxWidth) {
+    let words = text.split(' ');
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      let testLine = line + words[i] + ' ';
+      let metrics = $.context.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxWidth && i > 0) {
+        if ($.context.fillStyle) {
+          $.context.fillText(line, x, y);
+        }
+        if ($.context.strokeStyle) {
+          $.context.strokeText(line, x, y);
+        }
+        line = words[i] + ' ';
+        y += $.textLeadingVal;
+      } else {
+        line = testLine;
+      }
+    }
+    if ($.context.fillStyle) {
+      $.context.fillText(line, x, y);
+    }
+    if ($.context.strokeStyle) {
+      $.context.strokeText(line, x, y);
+    }
+
+  };
 
 };
 
@@ -2608,7 +2609,7 @@ T5.addOns.dom = ($, p, globalScope) => {
         };
     }
 
-
+  
 
     class T5Dom {
         constructor() {
@@ -3097,7 +3098,7 @@ T5.addOns.input = ($, p, globalScope) => {
     if (!('noCursor' in window)) {
         globalScope.noCursor = () => t5Input.noCursor();
     }
-
+    
     $.disableContextMenu = function () {
         if ($.canvas) {
             $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -3518,10 +3519,10 @@ T5.addOns.art = ($, p) => {
         [x, y] = $.scaleT5Coords([x, y]);
         [x, y] = [Math.floor(x), Math.floor(y)];
 
-        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
-            console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
-            return;
-        }
+    if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+        console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
+        return;
+    }
 
         const fillColor = handleColorArgument(colorArgs);
         if (!fillColor) {
