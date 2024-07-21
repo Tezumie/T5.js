@@ -56,7 +56,11 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
-        window.drawingContext = p.context;
+        if (renderer != 'graphics') {
+            window.drawingContext = p.context;
+        }
+
+        $.drawingContext = p.context
         window.width = $.width;
         window.height = $.height;
         window.canvasWidth = p.canvas.width;
@@ -263,6 +267,8 @@ T5.addOns.canvas = ($, p) => {
             source = src;
         } else if (src && src.canvas instanceof HTMLCanvasElement) {
             source = src.canvas;
+            sw = sw * $.t5PixelDensity
+            sh = sh * $.t5PixelDensity
         } else {
             source = $.canvas;
         }
