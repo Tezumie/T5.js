@@ -99,7 +99,9 @@ T5.addOns.image = ($, p) => {
         } else {
             $.context.drawImage(source, x, y, width, height);
         }
+        return img;
     };
+
 };
 
 T5.addOns.image(T5.prototype, T5.prototype);
