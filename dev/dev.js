@@ -1,3 +1,54 @@
+let gfx1, gfx2, gfx3;
+
+function setup() {
+    createCanvas(window.innerWidth, window.innerWidth);
+    flexibleCanvas(800)
+    pixelDensity(2)
+    //   noLoop();
+    // Create three graphics buffers
+    gfx1 = createGraphics(300, 300);
+    gfx2 = createGraphics(400, 400);
+    gfx3 = createGraphics(400, 400);
+
+    // Draw something on gfx1
+    gfx1.background(100);
+    gfx1.rect(0, 0, gfx1.width, gfx1.height);
+    gfx1.fill(255, 0, 0);
+    gfx1.ellipse(150, 150, 150, 150);
+
+    // Draw something on gfx2
+    gfx2.background(50);
+    gfx2.fill(0, 255, 0);
+    gfx2.rect(150, 150, 100, 100);
+
+    // Draw something on gfx3
+    gfx3.background(200);
+    gfx3.fill(0, 0, 255);
+    gfx3.triangle(200, 100, 250, 300, 150, 300);
+}
+
+function draw() {
+    background(255);
+
+    // Quadrant 1: Draw directly on the main canvas
+    fill(255, 255, 0);
+    rect(50, 50, 300, 300);
+
+    // Quadrant 2: Copy from gfx1 to the main canvas
+    let p = image(gfx1, 450, 50, 300, 300);
+    //   console.log(gfx1.width)
+    //   console.log(p.width)
+    // Quadrant 3: Copy from gfx2 to gfx3
+    gfx3.copy(gfx2, 0, 0, gfx2.width, gfx2.height, 0, 0, gfx3.width, gfx3.height);
+    image(gfx3, 50, 450, 300, 300);
+
+    // Quadrant 4: Copy from the main canvas to gfx1 only once
+    if (frameCount === 1) {
+        gfx1.copy(50, 50, 300, 300, 0, 0, 400, 400);
+    }
+    image(gfx1, 450, 450, 300, 300);
+    ellipse(mouseX, mouseY, 150, 150);
+}
 // let angle = 0;
 // function setup() {
 //     createCanvas(1400, 1400);
@@ -29,56 +80,56 @@
 //     }
 // }
 
-let img, Canvas;
+// let img, Canvas;
 
-function setup() {
-    Canvas = createCanvas(800, 800);
-    background(255);
-    noLoop();
-}
+// function setup() {
+//     Canvas = createCanvas(800, 800);
+//     background(255);
+//     noLoop();
+// }
 
-function draw() {
-    createSimplePattern();
-    createPattern();
+// function draw() {
+//     createSimplePattern();
+//     createPattern();
 
-    background(255);
+//     background(255);
 
-    // Draw and clip the pattern to a rectangle
-    rect(width / 2 - width / 4, 0, width / 2, height / 2);
-    beginPattern();
-    image(img, 0, 0);
-    endPattern();
+//     // Draw and clip the pattern to a rectangle
+//     rect(width / 2 - width / 4, 0, width / 2, height / 2);
+//     beginPattern();
+//     image(img, 0, 0);
+//     endPattern();
 
-    // Draw and clip the pattern to an ellipse
-    ellipse(width / 2, height - width / 4, width / 2);
-    beginPattern();
-    image(img, 0, 0);
-    endPattern();
-}
+//     // Draw and clip the pattern to an ellipse
+//     ellipse(width / 2, height - width / 4, width / 2);
+//     beginPattern();
+//     image(img, 0, 0);
+//     endPattern();
+// }
 
-function createPattern() {
-    img = createGraphics(width, height);
-    img.copy(Canvas, 0, 0, width, height, 0, 0, img.width, img.height);
-    clear();
-}
+// function createPattern() {
+//     img = createGraphics(width, height);
+//     img.copy(Canvas, 0, 0, width, height, 0, 0, img.width, img.height);
+//     clear();
+// }
 
-function beginPattern() {
-    drawingContext.save();
-    drawingContext.clip();
-}
+// function beginPattern() {
+//     drawingContext.save();
+//     drawingContext.clip();
+// }
 
-function endPattern() {
-    drawingContext.restore();
-}
+// function endPattern() {
+//     drawingContext.restore();
+// }
 
-function createSimplePattern() {
-    stroke(0);
-    strokeWeight(2);
-    for (let x = 0; x < width; x += 20) {
-        for (let y = 0; y < height; y += 20) {
-            line(x, y, x + 10, y + 10);
-            line(x + 10, y, x, y + 10);
-        }
-    }
-}
+// function createSimplePattern() {
+//     stroke(0);
+//     strokeWeight(2);
+//     for (let x = 0; x < width; x += 20) {
+//         for (let y = 0; y < height; y += 20) {
+//             line(x, y, x + 10, y + 10);
+//             line(x + 10, y, x, y + 10);
+//         }
+//     }
+// }
 
