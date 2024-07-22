@@ -56,17 +56,19 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
+        $.renderer = renderer
         if (renderer != 'graphics') {
             window.drawingContext = p.context;
+            window.width = $.width;
+            window.height = $.height;
+            window.canvasWidth = p.canvas.width;
+            window.canvasHeight = p.canvas.height;
+            window.canvas = p.canvas;
+            window.context = p.context;
         }
 
         $.drawingContext = p.context
-        window.width = $.width;
-        window.height = $.height;
-        window.canvasWidth = p.canvas.width;
-        window.canvasHeight = p.canvas.height;
-        window.canvas = p.canvas;
-        window.context = p.context;
+
 
         $.ctx = $.context = p.context;
 
@@ -118,12 +120,14 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.style.height = `${h}px`;
         $.width = w;
         $.height = h;
-        window.width = w;
-        window.height = h;
+        if ($.renderer != 'graphics') {
+            window.width = w;
+            window.height = h;
+        }
 
         window.canvasWidth = p.canvas.width;
         window.canvasHeight = p.canvas.height;
-        if (window.isFlexCanvas) {
+        if (window.isFlexCanvas && $.renderer != 'graphics') {
             window.width = $.dimensionUnit;
             window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
         }
@@ -242,8 +246,10 @@ T5.addOns.canvas = ($, p) => {
     $.flexibleCanvas = function (dimensionUnit) {
         $.dimensionUnit = dimensionUnit
         window.isFlexCanvas = true;
-        window.width = $.dimensionUnit;
-        window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+        if ($.renderer != 'graphics') {
+            window.width = $.dimensionUnit;
+            window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+        }
     };
 
     $.get = function (x, y, w, h) {
