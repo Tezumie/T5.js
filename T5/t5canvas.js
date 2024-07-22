@@ -475,6 +475,34 @@ T5.addOns.canvas = ($, p) => {
         canvas.setAttribute('aria-label', text);
         canvas.parentNode.insertBefore(description, canvas.nextSibling);
     };
+
+    $.saveCanvas = function (filename = 'untitled', extension = 'png') {
+        if (!$.canvas) {
+            console.error('No canvas found to save.');
+            return;
+        }
+
+        // Check if filename includes an extension and adjust accordingly
+        const filenameParts = filename.split('.');
+        if (filenameParts.length > 1) {
+            extension = filenameParts.pop();
+            filename = filenameParts.join('.');
+        }
+
+        const validExtensions = ['png', 'jpg'];
+        if (!validExtensions.includes(extension)) {
+            console.error(`Invalid extension: ${extension}. Valid extensions are 'png' and 'jpg'.`);
+            return;
+        }
+
+        const mimeType = extension === 'jpg' ? 'image/jpeg' : 'image/png';
+        const dataURL = $.canvas.toDataURL(mimeType);
+
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = `${filename}.${extension}`;
+        link.click();
+    };
 };
 // Integrate the canvas add-on
 T5.addOns.canvas(T5.prototype, T5.prototype);
