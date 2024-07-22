@@ -255,17 +255,19 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
+        $.renderer = renderer
         if (renderer != 'graphics') {
             window.drawingContext = p.context;
+            window.width = $.width;
+            window.height = $.height;
+            window.canvasWidth = p.canvas.width;
+            window.canvasHeight = p.canvas.height;
+            window.canvas = p.canvas;
+            window.context = p.context;
         }
 
         $.drawingContext = p.context
-        window.width = $.width;
-        window.height = $.height;
-        window.canvasWidth = p.canvas.width;
-        window.canvasHeight = p.canvas.height;
-        window.canvas = p.canvas;
-        window.context = p.context;
+
 
         $.ctx = $.context = p.context;
 
@@ -317,12 +319,14 @@ T5.addOns.canvas = ($, p) => {
         p.canvas.style.height = `${h}px`;
         $.width = w;
         $.height = h;
-        window.width = w;
-        window.height = h;
+        if ($.renderer != 'graphics') {
+            window.width = w;
+            window.height = h;
+        }
 
         window.canvasWidth = p.canvas.width;
         window.canvasHeight = p.canvas.height;
-        if (window.isFlexCanvas) {
+        if (window.isFlexCanvas && $.renderer != 'graphics') {
             window.width = $.dimensionUnit;
             window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
         }
@@ -441,8 +445,10 @@ T5.addOns.canvas = ($, p) => {
     $.flexibleCanvas = function (dimensionUnit) {
         $.dimensionUnit = dimensionUnit
         window.isFlexCanvas = true;
-        window.width = $.dimensionUnit;
-        window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+        if ($.renderer != 'graphics') {
+            window.width = $.dimensionUnit;
+            window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+        }
     };
 
     $.get = function (x, y, w, h) {
@@ -667,6 +673,34 @@ T5.addOns.canvas = ($, p) => {
 
         canvas.setAttribute('aria-label', text);
         canvas.parentNode.insertBefore(description, canvas.nextSibling);
+    };
+
+    $.saveCanvas = function (filename = 'untitled', extension = 'png') {
+        if (!$.canvas) {
+            console.error('No canvas found to save.');
+            return;
+        }
+
+        // Check if filename includes an extension and adjust accordingly
+        const filenameParts = filename.split('.');
+        if (filenameParts.length > 1) {
+            extension = filenameParts.pop();
+            filename = filenameParts.join('.');
+        }
+
+        const validExtensions = ['png', 'jpg'];
+        if (!validExtensions.includes(extension)) {
+            console.error(`Invalid extension: ${extension}. Valid extensions are 'png' and 'jpg'.`);
+            return;
+        }
+
+        const mimeType = extension === 'jpg' ? 'image/jpeg' : 'image/png';
+        const dataURL = $.canvas.toDataURL(mimeType);
+
+        const link = document.createElement('a');
+        link.href = dataURL;
+        link.download = `${filename}.${extension}`;
+        link.click();
     };
 };
 // Integrate the canvas add-on
