@@ -119,7 +119,7 @@ T5.addOns.strings = ($, p) => {
     $.loadStrings = function (path, callback) {
         window.t5PreloadCount++;
         const t5Strings = [];
-        
+
         fetch(path)
             .then(response => {
                 if (!response.ok) {
