@@ -20,7 +20,11 @@ T5.addOns.colors = ($, p) => {
         }
 
         toString() {
-            return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+            if (this.a === 255) {
+                return `rgb(${this.r}, ${this.g}, ${this.b})`;
+            } else {
+                return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+            }
         }
     }
 
@@ -123,36 +127,49 @@ T5.addOns.colors = ($, p) => {
     };
 
     function handleColorArgument(args) {
+        let colorObj;
         if (args.length === 1 && $.isColorObject(args[0])) {
-            return args[0].toString();
+            colorObj = args[0];
         } else if (args.length === 1 && Array.isArray(args[0])) {
-            const colorObj = $.color(...args[0]);
-            return colorObj ? colorObj.toString() : null;
+            colorObj = $.color(...args[0]);
         } else {
-            const colorObj = $.color(...args);
-            return colorObj ? colorObj.toString() : null;
+            colorObj = $.color(...args);
+        }
+        return colorObj;
+    }
+
+    function updateAlphaFlags(colorObj, type) {
+        if (type === 'fill') {
+            $.noAlphaFill = (colorObj.a === 0);
+        } else if (type === 'stroke') {
+            $.noAlphaStroke = (colorObj.a === 0);
         }
     }
 
     $.fill = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.fillStyle = colorString;
             $.textFillColor = colorString;
+            updateAlphaFlags(colorObj, 'fill');
         }
     };
 
     $.stroke = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.strokeStyle = colorString;
             $.textStrokeColor = colorString;
+            updateAlphaFlags(colorObj, 'stroke');
         }
     };
 
     $.background = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.save();
             $.context.fillStyle = colorString;
             $.context.fillRect(0, 0, $.canvas.width, $.canvas.height);
@@ -163,11 +180,13 @@ T5.addOns.colors = ($, p) => {
     $.noFill = function () {
         $.context.fillStyle = 'rgba(0,0,0,0)';
         $.textFillColor = 'rgba(0,0,0,0)';
+        $.noAlphaFill = true;
     };
 
     $.noStroke = function () {
         $.context.strokeStyle = 'rgba(0,0,0,0)';
         $.textStrokeColor = 'rgba(0,0,0,0)';
+        $.noAlphaStroke = true;
     };
 
     $.smooth = function () {
@@ -184,9 +203,9 @@ T5.addOns.colors = ($, p) => {
     };
     $.currentTint = null;
     $.tint = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
-            $.currentTint = colorString;
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            $.currentTint = colorObj.toString();
         }
     };
 
