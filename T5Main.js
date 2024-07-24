@@ -1091,6 +1091,47 @@ T5.addOns.image = ($, p) => {
 };
 
 T5.addOns.image(T5.prototype, T5.prototype);
+
+//************************************************************************//
+//*******************************-T5Strings-******************************//
+//************************************************************************//
+T5.addOns.strings = ($, p) => {
+    class T5Strings {
+        constructor(lines) {
+            this.lines = lines;
+        }
+    }
+
+    $.loadStrings = function (path, callback) {
+        window.t5PreloadCount++;
+        const t5Strings = [];
+
+        fetch(path)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`Failed to load strings from path: ${path}. Please check your file path.`);
+                }
+                return response.text();
+            })
+            .then(text => {
+                const lines = text.split(/\r?\n/);
+                lines.forEach(line => t5Strings.push(line));
+                window.t5PreloadDone++;
+                if (callback) {
+                    callback(t5Strings);
+                }
+            })
+            .catch(error => {
+                window.t5PreloadDone++;
+                console.error(error.message);
+            });
+
+        return t5Strings;
+    };
+};
+
+T5.addOns.strings(T5.prototype, T5.prototype);
+
 //************************************************************************//
 //********************************-T5Draw-********************************//
 //************************************************************************//
