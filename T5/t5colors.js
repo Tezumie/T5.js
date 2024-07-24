@@ -108,6 +108,8 @@ T5.addOns.colors = ($, p) => {
             return parseColorString(args[0]);
         } else if (args.length === 1 && typeof args[0] === 'number') {
             return new ColorRGBA(args[0], args[0], args[0]);
+        } else if (args.length === 1 && Array.isArray(args[0])) {
+            return new ColorRGBA(...args[0]);
         } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
             return new ColorRGBA(args[0], args[0], args[0], args[1]);
         } else if (args.length >= 3) {
@@ -123,6 +125,9 @@ T5.addOns.colors = ($, p) => {
     function handleColorArgument(args) {
         if (args.length === 1 && $.isColorObject(args[0])) {
             return args[0].toString();
+        } else if (args.length === 1 && Array.isArray(args[0])) {
+            const colorObj = $.color(...args[0]);
+            return colorObj ? colorObj.toString() : null;
         } else {
             const colorObj = $.color(...args);
             return colorObj ? colorObj.toString() : null;
@@ -166,16 +171,16 @@ T5.addOns.colors = ($, p) => {
     };
 
     $.smooth = function () {
-        $.context.imageSmoothingEnabled = true
+        $.context.imageSmoothingEnabled = true;
     };
     $.noSmooth = function () {
         $.context.imageSmoothingEnabled = false;
     };
     $.noAntialiasing = function () {
-        $.context.filter = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxmaWx0ZXIgaWQ9ImZpbHRlciIgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jUiB0eXBlPSJpZGVudGl0eSIvPjxmZUZ1bmNHIHR5cGU9ImlkZW50aXR5Ii8+PGZlRnVuY0IgdHlwZT0iaWRlbnRpdHkiLz48ZmVGdW5jQSB0eXBlPSJkaXNjcmV0ZSIgdGFibGVWYWx1ZXM9IjAgMSIvPjwvZmVDb21wb25lbnRUcmFuc2Zlcj48L2ZpbHRlcj48L3N2Zz4=#filter)"
+        $.context.filter = "url(data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPjxmaWx0ZXIgaWQ9ImZpbHRlciIgeD0iMCIgeT0iMCIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgY29sb3ItaW50ZXJwb2xhdGlvbi1maWx0ZXJzPSJzUkdCIj48ZmVDb21wb25lbnRUcmFuc2Zlcj48ZmVGdW5jUiB0eXBlPSJpZGVudGl0eSIvPjxmZUZ1bmNHIHR5cGU9ImlkZW50aXR5Ii8+PGZlRnVuY0IgdHlwZT0iaWRlbnRpdHkiLz48ZmVGdW5jQSB0eXBlPSJkaXNjcmV0ZSIgdGFibGVWYWx1ZXM9IjAgMSIvPjwvZmVDb21wb25lbnRUcmFuc2Zlcj48L2ZpbHRlcj48L3N2Zz4=#filter)";
     };
     $.antialiasing = function () {
-        $.context.filter = "none"
+        $.context.filter = "none";
     };
     $.currentTint = null;
     $.tint = function (...args) {
@@ -209,6 +214,7 @@ T5.addOns.colors = ($, p) => {
         const colorObj = $.color(col);
         return colorObj.a;
     };
+
     $.lerpColor = function (c1, c2, amt) {
         // Ensure amt is clamped between 0 and 1
         amt = Math.max(0, Math.min(1, amt));
@@ -231,18 +237,18 @@ T5.addOns.colors = ($, p) => {
     $.lerp = function (start, stop, amt) {
         return start + (stop - start) * amt;
     };
-    
-	$.erase = function (fillAlpha = 255, strokeAlpha = 255) {
-		$.context.save();
-		$.context.globalCompositeOperation = 'destination-out';
-		$.context.fillStyle = `rgba(0, 0, 0, ${fillAlpha / 255})`;
-		$.context.strokeStyle = `rgba(0, 0, 0, ${strokeAlpha / 255})`;
-	};
 
-	$.noErase = function () {
-		$.context.globalCompositeOperation = 'source-over';
-		$.context.restore();
-	};
+    $.erase = function (fillAlpha = 255, strokeAlpha = 255) {
+        $.context.save();
+        $.context.globalCompositeOperation = 'destination-out';
+        $.context.fillStyle = `rgba(0, 0, 0, ${fillAlpha / 255})`;
+        $.context.strokeStyle = `rgba(0, 0, 0, ${strokeAlpha / 255})`;
+    };
+
+    $.noErase = function () {
+        $.context.globalCompositeOperation = 'source-over';
+        $.context.restore();
+    };
 };
 
 T5.addOns.colors(T5.prototype, T5.prototype);
