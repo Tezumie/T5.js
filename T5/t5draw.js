@@ -15,21 +15,34 @@ T5.addOns.draw = ($, p) => {
     $.defineConstant('RADIUS', 'radius');
     $.defineConstant('CORNER', 'corner');
     $.defineConstant('CORNERS', 'corners');
+
     $.rect = function (x, y, w, h = w) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x, y)
-                $.vertex(x + w, y)
-                $.vertex(x + w, y + h)
-                $.vertex(x, y + h)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x, y);
+                $.vertex(x + w, y);
+                $.vertex(x + w, y + h);
+                $.vertex(x, y + h);
+                $.endShape(CLOSE);
             } else {
                 [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
-                $.context.beginPath();
-                $.context.rect(x, y, w, h);
-                $.context.fill();
-                $.context.stroke();
+                if ($.noAlphaStroke && !$.noAlphaFill) {
+                    $.context.fillRect(x, y, w, h);
+                } else {
+                    $.context.beginPath();
+                    $.context.rect(x, y, w, h);
+                    if (!$.noAlphaFill) {
+                        $.context.fill();
+                    }
+                    if (!$.noAlphaStroke) {
+                        $.context.stroke();
+                    }
+                }
             }
         }
     };
@@ -46,12 +59,24 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.ellipse = function (x, y, w, h = w) {
-        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
         if ($.context) {
-            $.context.beginPath();
-            $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
-            $.context.fill();
-            $.context.stroke();
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+            if ($.noAlphaStroke && !$.noAlphaFill) {
+                $.fillEllipse(x, y, w, h);
+            } else {
+                $.context.beginPath();
+                $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
+            }
         }
     };
 
@@ -59,9 +84,22 @@ T5.addOns.draw = ($, p) => {
         $.ellipse(x, y, w, h);
     };
 
-    $.line = function (x1, y1, x2, y2) {
-        [x1, y1, x2, y2] = $.scaleT5Coords([x1, y1, x2, y2]);
+    $.fillEllipse = function (x, y, w, h = w) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
         if ($.context) {
+            $.context.beginPath();
+            $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+            $.context.fill();
+        }
+    };
+
+    $.line = function (x1, y1, x2, y2) {
+        if ($.context) {
+            if ($.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2] = $.scaleT5Coords([x1, y1, x2, y2]);
             $.context.beginPath();
             $.context.moveTo(x1, y1);
             $.context.lineTo(x2, y2);
@@ -70,7 +108,7 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.strokeWeight = function (weight) {
-        weight = $.scaleT5Coord(weight)
+        weight = $.scaleT5Coord(weight);
         if (weight == 0) {
             $.context.strokeStyle = 'rgba(0,0,0,0)';
         }
@@ -79,13 +117,17 @@ T5.addOns.draw = ($, p) => {
 
     $.quad = function (x1, y1, x2, y2, x3, y3, x4, y4) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x1, y1)
-                $.vertex(x2, y2)
-                $.vertex(x3, y3)
-                $.vertex(x4, y4)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x1, y1);
+                $.vertex(x2, y2);
+                $.vertex(x3, y3);
+                $.vertex(x4, y4);
+                $.endShape(CLOSE);
             } else {
                 [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
                 $.context.beginPath();
@@ -94,20 +136,28 @@ T5.addOns.draw = ($, p) => {
                 $.context.lineTo(x3, y3);
                 $.context.lineTo(x4, y4);
                 $.context.closePath();
-                $.context.fill();
-                $.context.stroke();
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
             }
         }
     };
 
     $.triangle = function (x1, y1, x2, y2, x3, y3) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x1, y1)
-                $.vertex(x2, y2)
-                $.vertex(x3, y3)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x1, y1);
+                $.vertex(x2, y2);
+                $.vertex(x3, y3);
+                $.endShape(CLOSE);
             } else {
                 [x1, y1, x2, y2, x3, y3] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3]);
                 $.context.beginPath();
@@ -115,8 +165,12 @@ T5.addOns.draw = ($, p) => {
                 $.context.lineTo(x2, y2);
                 $.context.lineTo(x3, y3);
                 $.context.closePath();
-                $.context.fill();
-                $.context.stroke();
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
             }
         }
     };
@@ -148,16 +202,20 @@ T5.addOns.draw = ($, p) => {
 
     $.borderRadius = function (...radii) {
         if (radii == null || radii == undefined || radii == 'none') {
-            $.borderRadii = []
+            $.borderRadii = [];
         }
         $.borderRadii = radii;
     };
     $.noBorderRadius = function () {
-        $.borderRadii = []
-    }
+        $.borderRadii = [];
+    };
 
     $.endShape = function (CLOSE) {
         if ($.context && currentShapeVertices.length > 0) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             $.context.beginPath();
 
             if ($.borderRadii.length > 0) {
@@ -244,12 +302,15 @@ T5.addOns.draw = ($, p) => {
                 }
             }
 
-            $.context.fill();
-            $.context.stroke();
+            if (!$.noAlphaFill) {
+                $.context.fill();
+            }
+            if (!$.noAlphaStroke) {
+                $.context.stroke();
+            }
             currentShapeVertices = [];
             currentShapeMode = '';
         }
-        // $.borderRadii = [];
     };
 
     function _drawPathWithBorderRadius(ctx, vertices, close) {
@@ -313,20 +374,31 @@ T5.addOns.draw = ($, p) => {
         return radius;
     }
 
-
     $.arc = function (x, y, radius, startAngle, endAngle, counterclockwise = false) {
-        [x, y, radius] = $.scaleT5Coords([x, y, radius]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y, radius] = $.scaleT5Coords([x, y, radius]);
             $.context.beginPath();
             $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
-            $.context.fill();
-            $.context.stroke();
+            if (!$.noAlphaFill) {
+                $.context.fill();
+            }
+            if (!$.noAlphaStroke) {
+                $.context.stroke();
+            }
         }
     };
 
     $.point = function (x, y) {
-        [x, y] = $.scaleT5Coords([x, y]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y] = $.scaleT5Coords([x, y]);
             $.context.save();
             $.context.beginPath();
             $.context.arc(x, y, $.context.lineWidth / 2, 0, Math.PI * 2);
@@ -337,28 +409,39 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.fillText = function (text, x, y) {
-        [text, x, y] = $.scaleT5Coords([text, x, y]);
         if ($.context) {
+            [text, x, y] = $.scaleT5Coords([text, x, y]);
             $.context.fillText(text, x, y);
         }
     };
 
     $.clear = function () {
-        $.context.clearRect(0, 0, $.canvas.width, $.canvas.height);
+        if ($.context) {
+            $.context.clearRect(0, 0, $.canvas.width, $.canvas.height);
+        }
     };
 
     $.bezier = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             $.context.beginPath();
             $.context.moveTo(x1, y1);
             $.context.bezierCurveTo(x2, y2, x3, y3, x4, y4);
             $.context.stroke();
         }
     };
+
     $.bezierCurve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             let cp1x = x2 + (x3 - x1) / 6;
             let cp1y = y2 + (y3 - y1) / 6;
             let cp2x = x3 - (x4 - x2) / 6;
@@ -370,9 +453,14 @@ T5.addOns.draw = ($, p) => {
             $.context.stroke();
         }
     };
+
     $.curve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             let cp1x = x2 + (x3 - x1) / 6;
             let cp1y = y2 + (y3 - y1) / 6;
             let cp2x = x3 - (x4 - x2) / 6;
