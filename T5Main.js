@@ -751,7 +751,11 @@ T5.addOns.colors = ($, p) => {
         }
 
         toString() {
-            return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+            if (this.a === 255) {
+                return `rgb(${this.r}, ${this.g}, ${this.b})`;
+            } else {
+                return `rgba(${this.r}, ${this.g}, ${this.b}, ${this.a / 255})`;
+            }
         }
     }
 
@@ -854,36 +858,49 @@ T5.addOns.colors = ($, p) => {
     };
 
     function handleColorArgument(args) {
+        let colorObj;
         if (args.length === 1 && $.isColorObject(args[0])) {
-            return args[0].toString();
+            colorObj = args[0];
         } else if (args.length === 1 && Array.isArray(args[0])) {
-            const colorObj = $.color(...args[0]);
-            return colorObj ? colorObj.toString() : null;
+            colorObj = $.color(...args[0]);
         } else {
-            const colorObj = $.color(...args);
-            return colorObj ? colorObj.toString() : null;
+            colorObj = $.color(...args);
+        }
+        return colorObj;
+    }
+
+    function updateAlphaFlags(colorObj, type) {
+        if (type === 'fill') {
+            $.noAlphaFill = (colorObj.a === 0);
+        } else if (type === 'stroke') {
+            $.noAlphaStroke = (colorObj.a === 0);
         }
     }
 
     $.fill = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.fillStyle = colorString;
             $.textFillColor = colorString;
+            updateAlphaFlags(colorObj, 'fill');
         }
     };
 
     $.stroke = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.strokeStyle = colorString;
             $.textStrokeColor = colorString;
+            updateAlphaFlags(colorObj, 'stroke');
         }
     };
 
     $.background = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            const colorString = colorObj.toString();
             $.context.save();
             $.context.fillStyle = colorString;
             $.context.fillRect(0, 0, $.canvas.width, $.canvas.height);
@@ -894,11 +911,13 @@ T5.addOns.colors = ($, p) => {
     $.noFill = function () {
         $.context.fillStyle = 'rgba(0,0,0,0)';
         $.textFillColor = 'rgba(0,0,0,0)';
+        $.noAlphaFill = true;
     };
 
     $.noStroke = function () {
         $.context.strokeStyle = 'rgba(0,0,0,0)';
         $.textStrokeColor = 'rgba(0,0,0,0)';
+        $.noAlphaStroke = true;
     };
 
     $.smooth = function () {
@@ -915,9 +934,9 @@ T5.addOns.colors = ($, p) => {
     };
     $.currentTint = null;
     $.tint = function (...args) {
-        const colorString = handleColorArgument(args);
-        if (colorString) {
-            $.currentTint = colorString;
+        const colorObj = handleColorArgument(args);
+        if (colorObj) {
+            $.currentTint = colorObj.toString();
         }
     };
 
@@ -1105,7 +1124,7 @@ T5.addOns.strings = ($, p) => {
     $.loadStrings = function (path, callback) {
         window.t5PreloadCount++;
         const t5Strings = [];
-
+        
         fetch(path)
             .then(response => {
                 if (!response.ok) {
@@ -1149,21 +1168,34 @@ T5.addOns.draw = ($, p) => {
     $.defineConstant('RADIUS', 'radius');
     $.defineConstant('CORNER', 'corner');
     $.defineConstant('CORNERS', 'corners');
+
     $.rect = function (x, y, w, h = w) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x, y)
-                $.vertex(x + w, y)
-                $.vertex(x + w, y + h)
-                $.vertex(x, y + h)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x, y);
+                $.vertex(x + w, y);
+                $.vertex(x + w, y + h);
+                $.vertex(x, y + h);
+                $.endShape(CLOSE);
             } else {
                 [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
-                $.context.beginPath();
-                $.context.rect(x, y, w, h);
-                $.context.fill();
-                $.context.stroke();
+                if ($.noAlphaStroke && !$.noAlphaFill) {
+                    $.context.fillRect(x, y, w, h);
+                } else {
+                    $.context.beginPath();
+                    $.context.rect(x, y, w, h);
+                    if (!$.noAlphaFill) {
+                        $.context.fill();
+                    }
+                    if (!$.noAlphaStroke) {
+                        $.context.stroke();
+                    }
+                }
             }
         }
     };
@@ -1180,12 +1212,24 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.ellipse = function (x, y, w, h = w) {
-        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
         if ($.context) {
-            $.context.beginPath();
-            $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
-            $.context.fill();
-            $.context.stroke();
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+            if ($.noAlphaStroke && !$.noAlphaFill) {
+                $.fillEllipse(x, y, w, h);
+            } else {
+                $.context.beginPath();
+                $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
+            }
         }
     };
 
@@ -1193,9 +1237,22 @@ T5.addOns.draw = ($, p) => {
         $.ellipse(x, y, w, h);
     };
 
-    $.line = function (x1, y1, x2, y2) {
-        [x1, y1, x2, y2] = $.scaleT5Coords([x1, y1, x2, y2]);
+    $.fillEllipse = function (x, y, w, h = w) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
         if ($.context) {
+            $.context.beginPath();
+            $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
+            $.context.fill();
+        }
+    };
+
+    $.line = function (x1, y1, x2, y2) {
+        if ($.context) {
+            if ($.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2] = $.scaleT5Coords([x1, y1, x2, y2]);
             $.context.beginPath();
             $.context.moveTo(x1, y1);
             $.context.lineTo(x2, y2);
@@ -1204,7 +1261,7 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.strokeWeight = function (weight) {
-        weight = $.scaleT5Coord(weight)
+        weight = $.scaleT5Coord(weight);
         if (weight == 0) {
             $.context.strokeStyle = 'rgba(0,0,0,0)';
         }
@@ -1213,13 +1270,17 @@ T5.addOns.draw = ($, p) => {
 
     $.quad = function (x1, y1, x2, y2, x3, y3, x4, y4) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x1, y1)
-                $.vertex(x2, y2)
-                $.vertex(x3, y3)
-                $.vertex(x4, y4)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x1, y1);
+                $.vertex(x2, y2);
+                $.vertex(x3, y3);
+                $.vertex(x4, y4);
+                $.endShape(CLOSE);
             } else {
                 [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
                 $.context.beginPath();
@@ -1228,20 +1289,28 @@ T5.addOns.draw = ($, p) => {
                 $.context.lineTo(x3, y3);
                 $.context.lineTo(x4, y4);
                 $.context.closePath();
-                $.context.fill();
-                $.context.stroke();
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
             }
         }
     };
 
     $.triangle = function (x1, y1, x2, y2, x3, y3) {
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             if ($.borderRadii.length > 0) {
-                $.beginShape()
-                $.vertex(x1, y1)
-                $.vertex(x2, y2)
-                $.vertex(x3, y3)
-                $.endShape(CLOSE)
+                $.beginShape();
+                $.vertex(x1, y1);
+                $.vertex(x2, y2);
+                $.vertex(x3, y3);
+                $.endShape(CLOSE);
             } else {
                 [x1, y1, x2, y2, x3, y3] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3]);
                 $.context.beginPath();
@@ -1249,8 +1318,12 @@ T5.addOns.draw = ($, p) => {
                 $.context.lineTo(x2, y2);
                 $.context.lineTo(x3, y3);
                 $.context.closePath();
-                $.context.fill();
-                $.context.stroke();
+                if (!$.noAlphaFill) {
+                    $.context.fill();
+                }
+                if (!$.noAlphaStroke) {
+                    $.context.stroke();
+                }
             }
         }
     };
@@ -1282,16 +1355,20 @@ T5.addOns.draw = ($, p) => {
 
     $.borderRadius = function (...radii) {
         if (radii == null || radii == undefined || radii == 'none') {
-            $.borderRadii = []
+            $.borderRadii = [];
         }
         $.borderRadii = radii;
     };
     $.noBorderRadius = function () {
-        $.borderRadii = []
-    }
+        $.borderRadii = [];
+    };
 
     $.endShape = function (CLOSE) {
         if ($.context && currentShapeVertices.length > 0) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
             $.context.beginPath();
 
             if ($.borderRadii.length > 0) {
@@ -1378,12 +1455,15 @@ T5.addOns.draw = ($, p) => {
                 }
             }
 
-            $.context.fill();
-            $.context.stroke();
+            if (!$.noAlphaFill) {
+                $.context.fill();
+            }
+            if (!$.noAlphaStroke) {
+                $.context.stroke();
+            }
             currentShapeVertices = [];
             currentShapeMode = '';
         }
-        // $.borderRadii = [];
     };
 
     function _drawPathWithBorderRadius(ctx, vertices, close) {
@@ -1447,20 +1527,31 @@ T5.addOns.draw = ($, p) => {
         return radius;
     }
 
-
     $.arc = function (x, y, radius, startAngle, endAngle, counterclockwise = false) {
-        [x, y, radius] = $.scaleT5Coords([x, y, radius]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y, radius] = $.scaleT5Coords([x, y, radius]);
             $.context.beginPath();
             $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
-            $.context.fill();
-            $.context.stroke();
+            if (!$.noAlphaFill) {
+                $.context.fill();
+            }
+            if (!$.noAlphaStroke) {
+                $.context.stroke();
+            }
         }
     };
 
     $.point = function (x, y) {
-        [x, y] = $.scaleT5Coords([x, y]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x, y] = $.scaleT5Coords([x, y]);
             $.context.save();
             $.context.beginPath();
             $.context.arc(x, y, $.context.lineWidth / 2, 0, Math.PI * 2);
@@ -1471,28 +1562,39 @@ T5.addOns.draw = ($, p) => {
     };
 
     $.fillText = function (text, x, y) {
-        [text, x, y] = $.scaleT5Coords([text, x, y]);
         if ($.context) {
+            [text, x, y] = $.scaleT5Coords([text, x, y]);
             $.context.fillText(text, x, y);
         }
     };
 
     $.clear = function () {
-        $.context.clearRect(0, 0, $.canvas.width, $.canvas.height);
+        if ($.context) {
+            $.context.clearRect(0, 0, $.canvas.width, $.canvas.height);
+        }
     };
 
     $.bezier = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             $.context.beginPath();
             $.context.moveTo(x1, y1);
             $.context.bezierCurveTo(x2, y2, x3, y3, x4, y4);
             $.context.stroke();
         }
     };
+
     $.bezierCurve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             let cp1x = x2 + (x3 - x1) / 6;
             let cp1y = y2 + (y3 - y1) / 6;
             let cp2x = x3 - (x4 - x2) / 6;
@@ -1504,9 +1606,14 @@ T5.addOns.draw = ($, p) => {
             $.context.stroke();
         }
     };
+
     $.curve = function (x1, y1, x2, y2, x3, y3, x4, y4) {
-        [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
         if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            [x1, y1, x2, y2, x3, y3, x4, y4] = $.scaleT5Coords([x1, y1, x2, y2, x3, y3, x4, y4]);
             let cp1x = x2 + (x3 - x1) / 6;
             let cp1y = y2 + (y3 - y1) / 6;
             let cp2x = x3 - (x4 - x2) / 6;
@@ -1521,6 +1628,7 @@ T5.addOns.draw = ($, p) => {
 };
 
 T5.addOns.draw(T5.prototype, T5.prototype);
+
 //************************************************************************//
 //********************************-T5Math-********************************//
 //************************************************************************//
@@ -1956,184 +2064,184 @@ T5.addOns.math(T5.prototype, T5.prototype);
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-    // Constants
-    $.defineConstant('NORMAL', 'normal');
-    $.defineConstant('ITALIC', 'italic');
-    $.defineConstant('BOLD', 'bold');
-    $.defineConstant('BOLDITALIC', 'italic bold');
-    $.defineConstant('CENTER', 'center');
-    $.defineConstant('MIDDLE', 'middle');
-    $.defineConstant('LEFT', 'left');
-    $.defineConstant('RIGHT', 'right');
-    $.defineConstant('TOP', 'top');
-    $.defineConstant('BOTTOM', 'bottom');
-    $.defineConstant('BASELINE', 'alphabetic');
-    $.defineConstant('WORD', 'word');
-    $.defineConstant('CHAR', 'char');
-    $.defineConstant('WRAP', 'wrap');
-    $.defineConstant('NOWRAP', 'nowrap');
+  // Constants
+  $.defineConstant('NORMAL', 'normal');
+  $.defineConstant('ITALIC', 'italic');
+  $.defineConstant('BOLD', 'bold');
+  $.defineConstant('BOLDITALIC', 'italic bold');
+  $.defineConstant('CENTER', 'center');
+  $.defineConstant('MIDDLE', 'middle');
+  $.defineConstant('LEFT', 'left');
+  $.defineConstant('RIGHT', 'right');
+  $.defineConstant('TOP', 'top');
+  $.defineConstant('BOTTOM', 'bottom');
+  $.defineConstant('BASELINE', 'alphabetic');
+  $.defineConstant('WORD', 'word');
+  $.defineConstant('CHAR', 'char');
+  $.defineConstant('WRAP', 'wrap');
+  $.defineConstant('NOWRAP', 'nowrap');
 
-    // Default text properties
-    $.textSizeVal = 12;
-    $.textAlignH = 'left';
-    $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
-    $.textLeadingVal = $.textSizeVal * 1.2;
-    $.textFontVal = 'sans-serif';
-    $.textStyleVal = 'normal';
-    $.textWrapVal = 'wrap';
-    $.textFillColor = '#000000';
-    $.textStrokeColor = '#000000';
+  // Default text properties
+  $.textSizeVal = 12;
+  $.textAlignH = 'left';
+  $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
+  $.textLeadingVal = $.textSizeVal * 1.2;
+  $.textFontVal = 'sans-serif';
+  $.textStyleVal = 'normal';
+  $.textWrapVal = 'wrap';
+  $.textFillColor = '#000000';
+  $.textStrokeColor = '#000000';
 
-    // Set text size
-    $.textSize = function (size) {
-        [size] = $.scaleT5Coords([size]);
-        if (size !== undefined) {
-            $.textSizeVal = size;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textSizeVal;
-    };
+  // Set text size
+  $.textSize = function (size) {
+    [size] = $.scaleT5Coords([size]);
+    if (size !== undefined) {
+      $.textSizeVal = size;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textSizeVal;
+  };
 
-    // Set text font
-    $.textFont = function (font) {
-        if (font instanceof T5Font) {
-            font = font.family;
-        }
-        if (font !== undefined) {
-            $.textFontVal = font;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textFontVal;
-    };
+  // Set text font
+  $.textFont = function (font) {
+    if (font instanceof T5Font) {
+      font = font.family;
+    }
+    if (font !== undefined) {
+      $.textFontVal = font;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textFontVal;
+  };
 
-    // Set text style (normal, bold, italic)
-    $.textStyle = function (style) {
-        if (style !== undefined) {
-            $.textStyleVal = style;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textStyleVal;
-    };
+  // Set text style (normal, bold, italic)
+  $.textStyle = function (style) {
+    if (style !== undefined) {
+      $.textStyleVal = style;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textStyleVal;
+  };
 
-    // Set text alignment
-    $.textAlign = function (hAlign, vAlign) {
-        if (hAlign !== undefined) {
-            $.textAlignH = hAlign;
-        }
-        if (vAlign !== undefined) {
-            $.textAlignV = vAlign;
-        }
-        $.context.textAlign = $.textAlignH;
-        $.context.textBaseline = $.textAlignV;
-    };
+  // Set text alignment
+  $.textAlign = function (hAlign, vAlign) {
+    if (hAlign !== undefined) {
+      $.textAlignH = hAlign;
+    }
+    if (vAlign !== undefined) {
+      $.textAlignV = vAlign;
+    }
+    $.context.textAlign = $.textAlignH;
+    $.context.textBaseline = $.textAlignV;
+  };
 
-    // Set text leading (line height)
-    $.textLeading = function (leading) {
-        [leading] = $.scaleT5Coords([leading]);
-        if (leading !== undefined) {
-            $.textLeadingVal = leading;
-        }
-        return $.textLeadingVal;
-    };
+  // Set text leading (line height)
+  $.textLeading = function (leading) {
+    [leading] = $.scaleT5Coords([leading]);
+    if (leading !== undefined) {
+      $.textLeadingVal = leading;
+    }
+    return $.textLeadingVal;
+  };
 
-    // Set text wrap
-    $.textWrap = function (wrapType) {
-        if (wrapType !== undefined) {
-            $.textWrapVal = wrapType;
-        }
-        return $.textWrapVal;
-    };
+  // Set text wrap
+  $.textWrap = function (wrapType) {
+    if (wrapType !== undefined) {
+      $.textWrapVal = wrapType;
+    }
+    return $.textWrapVal;
+  };
 
-    // Measure text width
-    $.textWidth = function (str) {
-        return $.context.measureText(str).width;
-    };
+  // Measure text width
+  $.textWidth = function (str) {
+    return $.context.measureText(str).width;
+  };
 
-    // Measure text ascent
-    $.textAscent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("M").actualBoundingBoxAscent;
-    };
+  // Measure text ascent
+  $.textAscent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("M").actualBoundingBoxAscent;
+  };
 
-    // Measure text descent
-    $.textDescent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("g").actualBoundingBoxDescent;
-    };
+  // Measure text descent
+  $.textDescent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("g").actualBoundingBoxDescent;
+  };
 
-    // Draw text
-    $.text = function (str, x, y, maxWidth) {
-        [x, y] = $.scaleT5Coords([x, y]);
-        const lines = str.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
-                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
-            } else {
-                if ($.context.fillStyle) {
-                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-                }
-                if ($.context.strokeStyle) {
-                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
-                }
-            }
-        }
-    };
-
-    // Draw wrapped text
-    $.drawWrappedText = function (text, x, y, maxWidth) {
-        let words = text.split(' ');
-        let line = '';
-        for (let i = 0; i < words.length; i++) {
-            let testLine = line + words[i] + ' ';
-            let metrics = $.context.measureText(testLine);
-            let testWidth = metrics.width;
-            if (testWidth > maxWidth && i > 0) {
-                if ($.context.fillStyle) {
-                    $.context.fillText(line, x, y);
-                }
-                if ($.context.strokeStyle) {
-                    $.context.strokeText(line, x, y);
-                }
-                line = words[i] + ' ';
-                y += $.textLeadingVal;
-            } else {
-                line = testLine;
-            }
-        }
+  // Draw text
+  $.text = function (str, x, y, maxWidth) {
+    [x, y] = $.scaleT5Coords([x, y]);
+    const lines = str.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+        $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+      } else {
         if ($.context.fillStyle) {
-            $.context.fillText(line, x, y);
+          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
         }
         if ($.context.strokeStyle) {
-            $.context.strokeText(line, x, y);
+          $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
         }
-    };
-
-    // Font class
-    class T5Font {
-        constructor(font, family) {
-            this.font = font;
-            this.family = family;
-        }
+      }
     }
+  };
 
-    // Load font
-    $.loadFont = function (path, callback) {
-        window.t5PreloadCount++;
-        const family = 'CustomFont' + window.t5PreloadCount;
-        const font = new FontFace(family, `url(${path})`);
-        const t5Font = new T5Font(font, family);
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            window.t5PreloadDone++;
-            if (callback) {
-                callback(t5Font);
-            }
-        }).catch((error) => {
-            window.t5PreloadDone++;
-            console.error(`Failed to load font at path: ${path}. Error: ${error}`);
-        });
-        return t5Font;
-    };
+  // Draw wrapped text
+  $.drawWrappedText = function (text, x, y, maxWidth) {
+    let words = text.split(' ');
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      let testLine = line + words[i] + ' ';
+      let metrics = $.context.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxWidth && i > 0) {
+        if ($.context.fillStyle) {
+          $.context.fillText(line, x, y);
+        }
+        if ($.context.strokeStyle) {
+          $.context.strokeText(line, x, y);
+        }
+        line = words[i] + ' ';
+        y += $.textLeadingVal;
+      } else {
+        line = testLine;
+      }
+    }
+    if ($.context.fillStyle) {
+      $.context.fillText(line, x, y);
+    }
+    if ($.context.strokeStyle) {
+      $.context.strokeText(line, x, y);
+    }
+  };
+
+  // Font class
+  class T5Font {
+    constructor(font, family) {
+      this.font = font;
+      this.family = family;
+    }
+  }
+
+  // Load font
+  $.loadFont = function (path, callback) {
+    window.t5PreloadCount++;
+    const family = 'CustomFont' + window.t5PreloadCount;
+    const font = new FontFace(family, `url(${path})`);
+    const t5Font = new T5Font(font, family);
+    font.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+      window.t5PreloadDone++;
+      if (callback) {
+        callback(t5Font);
+      }
+    }).catch((error) => {
+      window.t5PreloadDone++;
+      console.error(`Failed to load font at path: ${path}. Error: ${error}`);
+    });
+    return t5Font;
+  };
 
 };
 
@@ -2717,7 +2825,7 @@ T5.addOns.dom = ($, p, globalScope) => {
         };
     }
 
-
+  
 
     class T5Dom {
         constructor() {
@@ -3206,7 +3314,7 @@ T5.addOns.input = ($, p, globalScope) => {
     if (!('noCursor' in window)) {
         globalScope.noCursor = () => t5Input.noCursor();
     }
-
+    
     $.disableContextMenu = function () {
         if ($.canvas) {
             $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -3627,10 +3735,10 @@ T5.addOns.art = ($, p) => {
         [x, y] = $.scaleT5Coords([x, y]);
         [x, y] = [Math.floor(x), Math.floor(y)];
 
-        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
-            console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
-            return;
-        }
+    if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+        console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
+        return;
+    }
 
         const fillColor = handleColorArgument(colorArgs);
         if (!fillColor) {
