@@ -292,7 +292,7 @@ T5.addOns.vector = ($, p, globalScope) => {
 
     $.Vector = Vector;
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.T5.Vector = Vector;
         globalScope.T5.createVector = $.createVector;
         globalScope.t5 = globalScope.t5 || {};
