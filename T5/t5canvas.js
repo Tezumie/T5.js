@@ -12,7 +12,7 @@ T5.addOns.canvas = ($, p) => {
             return document.createElement('canvas');
         };
     $.defineConstant = function (constantName, value) {
-        const target = $._isGlobal ? window : $;
+        const target = $._globalSketch ? window : $;
         Object.defineProperty(target, constantName, {
             value: value,
             writable: false,
@@ -68,11 +68,8 @@ T5.addOns.canvas = ($, p) => {
         }
 
         $.drawingContext = p.context
-
-
         $.ctx = $.context = p.context;
 
-        // Set default styles
         $.ctx.fillStyle = 'rgb(255, 255, 255)';
         $.ctx.strokeStyle = 'rgb(0, 0, 0)';
         $.ctx.lineCap = 'round';
@@ -82,7 +79,7 @@ T5.addOns.canvas = ($, p) => {
         $.ctx.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
         $.ctx.save();
 
-        if ($._isGlobal) {
+        if ($._globalSketch) {
             Object.defineProperty(window, 'width', {
                 get: function () { return $.width; },
                 configurable: true,
@@ -93,7 +90,6 @@ T5.addOns.canvas = ($, p) => {
             });
         }
 
-        // Scale the canvas context for pixel density
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
 
         return new T5Element(p.canvas);
@@ -171,11 +167,9 @@ T5.addOns.canvas = ($, p) => {
                 filter: $.context.filter,
                 imageSmoothingEnabled: $.context.imageSmoothingEnabled
             };
-
             $.context.resetTransform();
             $.context.scale($.t5PixelDensity, $.t5PixelDensity);
 
-            // Restore the previous properties
             $.context.fillStyle = prevProps.fillStyle;
             $.context.strokeStyle = prevProps.strokeStyle;
             $.context.lineWidth = prevProps.lineWidth;
@@ -300,7 +294,7 @@ T5.addOns.canvas = ($, p) => {
             $.pixels.data.set(newPixels.data);
         }
         $.pixelData = $.pixels.data;
-        if ($._isGlobal) {
+        if ($._globalSketch) {
             window.pixels = $.pixelData;
         } else {
             p.pixels = $.pixelData;
@@ -319,7 +313,7 @@ T5.addOns.canvas = ($, p) => {
             $.ctx.drawImage(tempCanvas, x, y, w, h, x, y, w, h);
         }
     };
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         window.loadPixels = $.loadPixels.bind($);
         window.updatePixels = $.updatePixels.bind($);
     }
@@ -442,13 +436,11 @@ T5.addOns.canvas = ($, p) => {
         const canvas = $.canvas || p.canvas;
         if (!canvas) return;
 
-        // Remove existing description if present
         const existingDescription = document.getElementById('t5-canvas-description');
         if (existingDescription) {
             existingDescription.remove();
         }
 
-        // Create a new description element
         const description = document.createElement('div');
         description.id = 't5-canvas-description';
         description.innerText = text;
@@ -482,7 +474,6 @@ T5.addOns.canvas = ($, p) => {
             return;
         }
 
-        // Check if filename includes an extension and adjust accordingly
         const filenameParts = filename.split('.');
         if (filenameParts.length > 1) {
             extension = filenameParts.pop();
