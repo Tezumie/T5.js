@@ -410,7 +410,7 @@ T5.addOns.dom = ($, p, globalScope) => {
     $.createAudio = (src) => dom.createAudio(src);
     $.createCapture = () => dom.createCapture();
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.select = $.select;
         globalScope.selectAll = $.selectAll;
         globalScope.removeElements = $.removeElements;
