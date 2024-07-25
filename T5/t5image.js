@@ -30,7 +30,7 @@ T5.addOns.image = ($, p) => {
     };
 
     let tmpCanvas = null;
-    function makeTmpCtx(width, height) {
+    function createTempCanvas(width, height) {
         if (tmpCanvas != null) {
             return tmpCanvas.tmpCtx
         } else {
@@ -72,20 +72,20 @@ T5.addOns.image = ($, p) => {
         let height = h + offset || $.scaleT5Coord(source.height) + offset;
 
         if ($.currentTint) {
-            const tmpCtx = makeTmpCtx(width, height);
+            const tempCanvas = createTempCanvas(width, height);
 
             // Draw the image to the temporary canvas
-            tmpCtx.clearRect(0, 0, width, height);
-            tmpCtx.drawImage(source, 0, 0, width, height);
+            tempCanvas.clearRect(0, 0, width, height);
+            tempCanvas.drawImage(source, 0, 0, width, height);
 
             // Extract RGB and Alpha values from the current tint
             const tintRGB = extractRGBFromColorString($.currentTint);
             const tintAlpha = extractAlphaFromColorString($.currentTint);
 
             // Apply the tint color using the 'multiply' blend mode
-            tmpCtx.globalCompositeOperation = 'multiply';
-            tmpCtx.fillStyle = tintRGB;
-            tmpCtx.fillRect(0, 0, width, height);
+            tempCanvas.globalCompositeOperation = 'multiply';
+            tempCanvas.fillStyle = tintRGB;
+            tempCanvas.fillRect(0, 0, width, height);
 
             // Draw the tinted image back to the main canvas with the correct alpha
             $.context.save();
