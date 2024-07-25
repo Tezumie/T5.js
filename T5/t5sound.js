@@ -222,7 +222,7 @@ T5.addOns.sound = ($, p, globalScope) => {
         }
     };
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.loadSound = $.loadSound;
         globalScope.playSound = $.playSound;
         globalScope.pauseSound = $.pauseSound;
