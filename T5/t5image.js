@@ -29,9 +29,6 @@ T5.addOns.image = ($, p) => {
         return t5Img;
     };
 
-
-    // Create a temporary canvas for tinting operations
-
     let tmpCanvas = null;
     function makeTmpCtx(width, height) {
         if (tmpCanvas != null) {
