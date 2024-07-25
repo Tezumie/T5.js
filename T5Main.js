@@ -380,6 +380,34 @@ T5.addOns.canvas = ($, p) => {
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
     };
+    // Angle Modes
+    $.defineConstant('DEGREES', 'degrees');
+    $.defineConstant('RADIANS', 'radians');
+
+    $.currentAngleMode = "radians";
+
+    function radians(degrees) {
+        return degrees * (Math.PI / 180);
+    }
+
+    function degrees(radians) {
+        return radians * (180 / Math.PI);
+    }
+
+    $.angleMode = function (mode) {
+        if (mode === "radians" || mode === "degrees") {
+            $.currentAngleMode = mode;
+        } else {
+            console.error("Invalid angle mode. Use 'radians' or 'degrees'.");
+        }
+    };
+
+    $.convertAngle = function (angle) {
+        if ($.currentAngleMode === "degrees") {
+            return radians(angle);
+        }
+        return angle;
+    };
 
     $.translate = function (x, y) {
         if ($.context) {
@@ -389,7 +417,7 @@ T5.addOns.canvas = ($, p) => {
 
     $.rotate = function (angle) {
         if ($.context) {
-            $.context.rotate(angle);
+            $.context.rotate($.convertAngle(angle));
         }
     };
 
@@ -413,16 +441,15 @@ T5.addOns.canvas = ($, p) => {
 
     $.shearX = function (angle) {
         if ($.context) {
-            $.context.transform(1, 0, Math.tan(angle), 1, 0, 0);
+            $.context.transform(1, 0, Math.tan($.convertAngle(angle)), 1, 0, 0);
         }
     };
 
     $.shearY = function (angle) {
         if ($.context) {
-            $.context.transform(1, Math.tan(angle), 0, 1, 0, 0);
+            $.context.transform(1, Math.tan($.convertAngle(angle)), 0, 1, 0, 0);
         }
     };
-
     $.pixelDensity = function (density) {
         if (density === undefined) {
             return $.t5PixelDensity;
@@ -1517,6 +1544,9 @@ T5.addOns.draw = ($, p) => {
             }
 
             [x, y, radius] = $.scaleT5Coords([x, y, radius]);
+            startAngle = $.convertAngle(startAngle);
+            endAngle = $.convertAngle(endAngle);
+
             $.context.beginPath();
             $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
             if (!$.noAlphaFill) {
@@ -1625,14 +1655,38 @@ T5.addOns.math = ($, p) => {
     $.defineConstant('E', Math.E);
     $.defineConstant('SIMPLEX', 'simplex');
     $.defineConstant('PERLIN', 'perlin');
-    // Trigonometric Functions
-    $.sin = Math.sin;
-    $.cos = Math.cos;
-    $.tan = Math.tan;
-    $.asin = Math.asin;
-    $.acos = Math.acos;
-    $.atan = Math.atan;
-    $.atan2 = Math.atan2;
+    // Trigonometric functions
+    $.sin = function (angle) {
+        return Math.sin($.convertAngle(angle));
+    };
+
+    $.cos = function (angle) {
+        return Math.cos($.convertAngle(angle));
+    };
+
+    $.tan = function (angle) {
+        return Math.tan($.convertAngle(angle));
+    };
+
+    $.asin = function (value) {
+        let angle = Math.asin(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.acos = function (value) {
+        let angle = Math.acos(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.atan = function (value) {
+        let angle = Math.atan(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.atan2 = function (y, x) {
+        let angle = Math.atan2(y, x);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
 
     // Rounding Functions
     $.floor = Math.floor;
@@ -2026,15 +2080,7 @@ T5.addOns.math = ($, p) => {
         return noiseGenerator.noise(x, y, z);
     };
 
-    // Angle Modes
-    $.defineConstant('DEGREES', 'degrees');
-    $.defineConstant('RADIANS', 'radians');
-
-    $.DEGREES = 'degrees';
-    $.RADIANS = 'radians';
-    $.angleMode = $.RADIANS;
-
-    // Angle Conversion
+    // // Angle Conversion
     $.toRadians = (angle) => $.angleMode === DEGREES ? angle * (Math.PI / 180) : angle;
     $.toDegrees = (angle) => $.angleMode === RADIANS ? angle * (180 / Math.PI) : angle;
     $.noiseSeed(noiseSeedValue);
