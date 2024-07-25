@@ -258,7 +258,8 @@ T5.addOns.canvas = ($, p) => {
 
     $.copy = function (src, sx, sy, sw, sh, dx, dy, dw, dh) {
         let source;
-
+        sw = sw * $.t5PixelDensity
+        sh = sh * $.t5PixelDensity
         if (src instanceof $.Graphics) {
             source = src.canvas;
         } else if (src instanceof T5Element) {
@@ -267,8 +268,6 @@ T5.addOns.canvas = ($, p) => {
             source = src;
         } else if (src && src.canvas instanceof HTMLCanvasElement) {
             source = src.canvas;
-            sw = sw * $.t5PixelDensity
-            sh = sh * $.t5PixelDensity
         } else {
             source = $.canvas;
         }
