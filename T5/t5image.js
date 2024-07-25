@@ -67,7 +67,7 @@ T5.addOns.image = ($, p) => {
         } else {
             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
-        let offset = $.scaleT5Coord(0.65)
+        let offset = $.scaleT5Coord(0.0)
         let width = w + offset || $.scaleT5Coord(source.width) + offset;
         let height = h + offset || $.scaleT5Coord(source.height) + offset;
 
