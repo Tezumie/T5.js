@@ -11,14 +11,38 @@ T5.addOns.math = ($, p) => {
     $.defineConstant('E', Math.E);
     $.defineConstant('SIMPLEX', 'simplex');
     $.defineConstant('PERLIN', 'perlin');
-    // Trigonometric Functions
-    $.sin = Math.sin;
-    $.cos = Math.cos;
-    $.tan = Math.tan;
-    $.asin = Math.asin;
-    $.acos = Math.acos;
-    $.atan = Math.atan;
-    $.atan2 = Math.atan2;
+    // Trigonometric functions
+    $.sin = function (angle) {
+        return Math.sin($.convertAngle(angle));
+    };
+
+    $.cos = function (angle) {
+        return Math.cos($.convertAngle(angle));
+    };
+
+    $.tan = function (angle) {
+        return Math.tan($.convertAngle(angle));
+    };
+
+    $.asin = function (value) {
+        let angle = Math.asin(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.acos = function (value) {
+        let angle = Math.acos(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.atan = function (value) {
+        let angle = Math.atan(value);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
+
+    $.atan2 = function (y, x) {
+        let angle = Math.atan2(y, x);
+        return $.currentAngleMode === "degrees" ? degrees(angle) : angle;
+    };
 
     // Rounding Functions
     $.floor = Math.floor;
@@ -412,15 +436,7 @@ T5.addOns.math = ($, p) => {
         return noiseGenerator.noise(x, y, z);
     };
 
-    // Angle Modes
-    $.defineConstant('DEGREES', 'degrees');
-    $.defineConstant('RADIANS', 'radians');
-
-    $.DEGREES = 'degrees';
-    $.RADIANS = 'radians';
-    $.angleMode = $.RADIANS;
-
-    // Angle Conversion
+    // // Angle Conversion
     $.toRadians = (angle) => $.angleMode === DEGREES ? angle * (Math.PI / 180) : angle;
     $.toDegrees = (angle) => $.angleMode === RADIANS ? angle * (180 / Math.PI) : angle;
     $.noiseSeed(noiseSeedValue);
