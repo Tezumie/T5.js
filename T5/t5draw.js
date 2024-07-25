@@ -2,8 +2,6 @@
 //********************************-T5Draw-********************************//
 //************************************************************************//
 T5.addOns.draw = ($, p) => {
-
-    // Constants
     $.defineConstant('CLOSE', true);
     $.defineConstant('OPEN', false);
     $.defineConstant('ROUND', 'round');
