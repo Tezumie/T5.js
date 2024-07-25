@@ -183,6 +183,34 @@ T5.addOns.canvas = ($, p) => {
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
     };
+    // Angle Modes
+    $.defineConstant('DEGREES', 'degrees');
+    $.defineConstant('RADIANS', 'radians');
+
+    $.currentAngleMode = "radians";
+
+    function radians(degrees) {
+        return degrees * (Math.PI / 180);
+    }
+
+    function degrees(radians) {
+        return radians * (180 / Math.PI);
+    }
+
+    $.angleMode = function (mode) {
+        if (mode === "radians" || mode === "degrees") {
+            $.currentAngleMode = mode;
+        } else {
+            console.error("Invalid angle mode. Use 'radians' or 'degrees'.");
+        }
+    };
+
+    $.convertAngle = function (angle) {
+        if ($.currentAngleMode === "degrees") {
+            return radians(angle);
+        }
+        return angle;
+    };
 
     $.translate = function (x, y) {
         if ($.context) {
@@ -192,7 +220,7 @@ T5.addOns.canvas = ($, p) => {
 
     $.rotate = function (angle) {
         if ($.context) {
-            $.context.rotate(angle);
+            $.context.rotate($.convertAngle(angle));
         }
     };
 
@@ -216,16 +244,15 @@ T5.addOns.canvas = ($, p) => {
 
     $.shearX = function (angle) {
         if ($.context) {
-            $.context.transform(1, 0, Math.tan(angle), 1, 0, 0);
+            $.context.transform(1, 0, Math.tan($.convertAngle(angle)), 1, 0, 0);
         }
     };
 
     $.shearY = function (angle) {
         if ($.context) {
-            $.context.transform(1, Math.tan(angle), 0, 1, 0, 0);
+            $.context.transform(1, Math.tan($.convertAngle(angle)), 0, 1, 0, 0);
         }
     };
-
     $.pixelDensity = function (density) {
         if (density === undefined) {
             return $.t5PixelDensity;
