@@ -379,6 +379,9 @@ T5.addOns.draw = ($, p) => {
             }
 
             [x, y, radius] = $.scaleT5Coords([x, y, radius]);
+            startAngle = $.convertAngle(startAngle);
+            endAngle = $.convertAngle(endAngle);
+
             $.context.beginPath();
             $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
             if (!$.noAlphaFill) {
