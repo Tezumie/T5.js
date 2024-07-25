@@ -15,25 +15,25 @@ function T5(scope = 'global', parent) {
         if (scope === 'auto') {
             scope = (window.setup || window.draw) ? 'global' : 'local';
         }
-        $._isGlobal = (scope === 'global');
-        return $._isGlobal ? window : undefined;
+        $._globalSketch = (scope === 'global');
+        return $._globalSketch ? window : undefined;
     }
 
     const globalScope = setScope(scope);
 
-    const p = new Proxy($, {
+    const proxy = new Proxy($, {
         set: (target, property, value) => {
             target[property] = value;
-            if ($._isGlobal) globalScope[property] = value;
+            if ($._globalSketch) globalScope[property] = value;
             return true;
         }
     });
 
     $.frameCount = 0;
     $.deltaTime = 16;
-    $._targetFrameRate = 60;
-    $._targetFrameDuration = 1000 / $._targetFrameRate;
-    $._lastFrameTime = 0;
+    $._setFrameRate = 60;
+    $._frameLength = 1000 / $._setFrameRate;
+    $._previousFrame = 0;
     $._isLooping = true;
     $._shouldDrawOnce = false;
 
@@ -42,17 +42,17 @@ function T5(scope = 'global', parent) {
 
     $.frameRate = (rate) => {
         if (rate !== undefined) {
-            $._targetFrameRate = rate;
-            $._targetFrameDuration = 1000 / $._targetFrameRate;
+            $._setFrameRate = rate;
+            $._frameLength = 1000 / $._setFrameRate;
         } else {
             return $._frameRate;
         }
     };
 
-    function _draw(timestamp) {
+    function _draw() {
         $.resetMatrix();
-        let ts = timestamp || performance.now();
-        $._lastFrameTime ??= ts - $._targetFrameDuration;
+        let now = performance.now();
+        $._previousFrame ??= now - $._frameLength;
 
         if ($._isLooping || $._shouldDrawOnce) {
             requestAnimationFrame(_draw);
@@ -60,10 +60,10 @@ function T5(scope = 'global', parent) {
             return;
         }
 
-        let timeSinceLast = ts - $._lastFrameTime;
-        if (timeSinceLast < $._targetFrameDuration - 1) return;
+        let timeSinceLast = now - $._previousFrame;
+        if (timeSinceLast < $._frameLength - 1) return;
 
-        $.deltaTime = ts - $._lastFrameTime;
+        $.deltaTime = now - $._previousFrame;
         $._frameRate = 1000 / $.deltaTime;
         $.frameCount++;
         window.frameCount = $.frameCount;
@@ -100,7 +100,7 @@ function T5(scope = 'global', parent) {
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
 
-        $._lastFrameTime = ts;
+        $._previousFrame = now;
         $._shouldDrawOnce = false;
     }
 
@@ -119,7 +119,6 @@ function T5(scope = 'global', parent) {
         if (typeof $.preload === 'function') {
             $.preload();
         }
-
         // Check if preload function exists and if there are items to preload
         if (typeof $.preload !== 'function' || window.t5PreloadCount === window.t5PreloadDone) {
             millisStart = performance.now();
@@ -153,8 +152,7 @@ function T5(scope = 'global', parent) {
         }
     };
 
-
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         for (let method of ['setup', 'draw', 'preload', 'windowResized']) {
             if (window[method]) $[method] = window[method];
         }
@@ -166,10 +164,10 @@ function T5(scope = 'global', parent) {
     document.addEventListener('DOMContentLoaded', $.start);
 
     for (let m in T5.addOns) {
-        T5.addOns[m]($, p, globalScope);
+        T5.addOns[m]($, proxy, globalScope);
     }
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.T5 = T5;
         window.addEventListener('resize', () => {
             window.windowWidth = window.innerWidth;
@@ -211,7 +209,7 @@ T5.addOns.canvas = ($, p) => {
             return document.createElement('canvas');
         };
     $.defineConstant = function (constantName, value) {
-        const target = $._isGlobal ? window : $;
+        const target = $._globalSketch ? window : $;
         Object.defineProperty(target, constantName, {
             value: value,
             writable: false,
@@ -267,11 +265,8 @@ T5.addOns.canvas = ($, p) => {
         }
 
         $.drawingContext = p.context
-
-
         $.ctx = $.context = p.context;
 
-        // Set default styles
         $.ctx.fillStyle = 'rgb(255, 255, 255)';
         $.ctx.strokeStyle = 'rgb(0, 0, 0)';
         $.ctx.lineCap = 'round';
@@ -281,7 +276,7 @@ T5.addOns.canvas = ($, p) => {
         $.ctx.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
         $.ctx.save();
 
-        if ($._isGlobal) {
+        if ($._globalSketch) {
             Object.defineProperty(window, 'width', {
                 get: function () { return $.width; },
                 configurable: true,
@@ -292,7 +287,6 @@ T5.addOns.canvas = ($, p) => {
             });
         }
 
-        // Scale the canvas context for pixel density
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
 
         return new T5Element(p.canvas);
@@ -370,11 +364,9 @@ T5.addOns.canvas = ($, p) => {
                 filter: $.context.filter,
                 imageSmoothingEnabled: $.context.imageSmoothingEnabled
             };
-
             $.context.resetTransform();
             $.context.scale($.t5PixelDensity, $.t5PixelDensity);
 
-            // Restore the previous properties
             $.context.fillStyle = prevProps.fillStyle;
             $.context.strokeStyle = prevProps.strokeStyle;
             $.context.lineWidth = prevProps.lineWidth;
@@ -499,7 +491,7 @@ T5.addOns.canvas = ($, p) => {
             $.pixels.data.set(newPixels.data);
         }
         $.pixelData = $.pixels.data;
-        if ($._isGlobal) {
+        if ($._globalSketch) {
             window.pixels = $.pixelData;
         } else {
             p.pixels = $.pixelData;
@@ -518,7 +510,7 @@ T5.addOns.canvas = ($, p) => {
             $.ctx.drawImage(tempCanvas, x, y, w, h, x, y, w, h);
         }
     };
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         window.loadPixels = $.loadPixels.bind($);
         window.updatePixels = $.updatePixels.bind($);
     }
@@ -641,13 +633,11 @@ T5.addOns.canvas = ($, p) => {
         const canvas = $.canvas || p.canvas;
         if (!canvas) return;
 
-        // Remove existing description if present
         const existingDescription = document.getElementById('t5-canvas-description');
         if (existingDescription) {
             existingDescription.remove();
         }
 
-        // Create a new description element
         const description = document.createElement('div');
         description.id = 't5-canvas-description';
         description.innerText = text;
@@ -681,7 +671,6 @@ T5.addOns.canvas = ($, p) => {
             return;
         }
 
-        // Check if filename includes an extension and adjust accordingly
         const filenameParts = filename.split('.');
         if (filenameParts.length > 1) {
             extension = filenameParts.pop();
@@ -1034,9 +1023,6 @@ T5.addOns.image = ($, p) => {
         return t5Img;
     };
 
-
-    // Create a temporary canvas for tinting operations
-
     let tmpCanvas = null;
     function makeTmpCtx(width, height) {
         if (tmpCanvas != null) {
@@ -1124,7 +1110,7 @@ T5.addOns.strings = ($, p) => {
     $.loadStrings = function (path, callback) {
         window.t5PreloadCount++;
         const t5Strings = [];
-        
+
         fetch(path)
             .then(response => {
                 if (!response.ok) {
@@ -2542,7 +2528,7 @@ T5.addOns.vector = ($, p, globalScope) => {
 
     $.Vector = Vector;
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.T5.Vector = Vector;
         globalScope.T5.createVector = $.createVector;
         globalScope.t5 = globalScope.t5 || {};
@@ -2971,7 +2957,7 @@ T5.addOns.dom = ($, p, globalScope) => {
     $.createAudio = (src) => dom.createAudio(src);
     $.createCapture = () => dom.createCapture();
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.select = $.select;
         globalScope.selectAll = $.selectAll;
         globalScope.removeElements = $.removeElements;
@@ -3548,7 +3534,7 @@ T5.addOns.sound = ($, p, globalScope) => {
         }
     };
 
-    if ($._isGlobal) {
+    if ($._globalSketch) {
         globalScope.loadSound = $.loadSound;
         globalScope.playSound = $.playSound;
         globalScope.pauseSound = $.pauseSound;
