@@ -2,7 +2,6 @@
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-  // Constants
   $.defineConstant('NORMAL', 'normal');
   $.defineConstant('ITALIC', 'italic');
   $.defineConstant('BOLD', 'bold');
@@ -19,10 +18,9 @@ T5.addOns.text = ($, p) => {
   $.defineConstant('WRAP', 'wrap');
   $.defineConstant('NOWRAP', 'nowrap');
 
-  // Default text properties
   $.textSizeVal = 12;
   $.textAlignH = 'left';
-  $.textAlignV = 'alphabetic'; // Default to baseline for vertical alignment
+  $.textAlignV = 'alphabetic';
   $.textLeadingVal = $.textSizeVal * 1.2;
   $.textFontVal = 'sans-serif';
   $.textStyleVal = 'normal';
@@ -30,7 +28,6 @@ T5.addOns.text = ($, p) => {
   $.textFillColor = '#000000';
   $.textStrokeColor = '#000000';
 
-  // Set text size
   $.textSize = function (size) {
     [size] = $.scaleT5Coords([size]);
     if (size !== undefined) {
@@ -40,7 +37,6 @@ T5.addOns.text = ($, p) => {
     return $.textSizeVal;
   };
 
-  // Set text font
   $.textFont = function (font) {
     if (font instanceof T5Font) {
       font = font.family;
@@ -52,7 +48,6 @@ T5.addOns.text = ($, p) => {
     return $.textFontVal;
   };
 
-  // Set text style (normal, bold, italic)
   $.textStyle = function (style) {
     if (style !== undefined) {
       $.textStyleVal = style;
@@ -61,7 +56,6 @@ T5.addOns.text = ($, p) => {
     return $.textStyleVal;
   };
 
-  // Set text alignment
   $.textAlign = function (hAlign, vAlign) {
     if (hAlign !== undefined) {
       $.textAlignH = hAlign;
@@ -73,7 +67,6 @@ T5.addOns.text = ($, p) => {
     $.context.textBaseline = $.textAlignV;
   };
 
-  // Set text leading (line height)
   $.textLeading = function (leading) {
     [leading] = $.scaleT5Coords([leading]);
     if (leading !== undefined) {
@@ -82,7 +75,6 @@ T5.addOns.text = ($, p) => {
     return $.textLeadingVal;
   };
 
-  // Set text wrap
   $.textWrap = function (wrapType) {
     if (wrapType !== undefined) {
       $.textWrapVal = wrapType;
@@ -90,24 +82,20 @@ T5.addOns.text = ($, p) => {
     return $.textWrapVal;
   };
 
-  // Measure text width
   $.textWidth = function (str) {
     return $.context.measureText(str).width;
   };
 
-  // Measure text ascent
   $.textAscent = function () {
     $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
     return $.context.measureText("M").actualBoundingBoxAscent;
   };
 
-  // Measure text descent
   $.textDescent = function () {
     $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
     return $.context.measureText("g").actualBoundingBoxDescent;
   };
 
-  // Draw text
   $.text = function (str, x, y, maxWidth) {
     [x, y] = $.scaleT5Coords([x, y]);
     const lines = str.split('\n');
@@ -115,17 +103,16 @@ T5.addOns.text = ($, p) => {
       if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
         $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
       } else {
-        if ($.context.fillStyle) {
-          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-        }
-        if ($.context.strokeStyle) {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
           $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
         }
       }
     }
   };
 
-  // Draw wrapped text
   $.drawWrappedText = function (text, x, y, maxWidth) {
     let words = text.split(' ');
     let line = '';
@@ -134,11 +121,11 @@ T5.addOns.text = ($, p) => {
       let metrics = $.context.measureText(testLine);
       let testWidth = metrics.width;
       if (testWidth > maxWidth && i > 0) {
-        if ($.context.fillStyle) {
-          $.context.fillText(line, x, y);
-        }
-        if ($.context.strokeStyle) {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
           $.context.strokeText(line, x, y);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(line, x, y);
         }
         line = words[i] + ' ';
         y += $.textLeadingVal;
@@ -146,15 +133,14 @@ T5.addOns.text = ($, p) => {
         line = testLine;
       }
     }
-    if ($.context.fillStyle) {
-      $.context.fillText(line, x, y);
-    }
     if ($.context.strokeStyle) {
       $.context.strokeText(line, x, y);
     }
+    if ($.context.fillStyle) {
+      $.context.fillText(line, x, y);
+    }
   };
 
-  // Font class
   class T5Font {
     constructor(font, family) {
       this.font = font;
@@ -162,7 +148,6 @@ T5.addOns.text = ($, p) => {
     }
   }
 
-  // Load font
   $.loadFont = function (path, callback) {
     window.t5PreloadCount++;
     const family = 'CustomFont' + window.t5PreloadCount;
