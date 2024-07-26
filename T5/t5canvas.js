@@ -183,7 +183,42 @@ T5.addOns.canvas = ($, p) => {
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
     };
-    // Angle Modes
+
+    $.defineConstant('CORNER', 'corner');
+    $.defineConstant('CENTER', 'center');
+    $.defineConstant('CORNERS', 'corners');
+    $.defineConstant('RADIUS', 'radius');
+
+    $.currentRectMode = 'corner';
+
+    $.rectMode = function (mode) {
+        if (mode === 'corner' || mode === 'corners' || mode === 'center' || mode === 'radius') {
+            $.currentRectMode = mode;
+        } else {
+            console.error("Invalid rectangle mode. Use 'corner', 'corners', 'center', or 'radius'.");
+        }
+    };
+
+    $.currentEllipseMode = 'center';
+
+    $.ellipseMode = function (mode) {
+        if (mode === 'center' || mode === 'radius' || mode === 'corner' || mode === 'corners') {
+            $.currentEllipseMode = mode;
+        } else {
+            console.error("Invalid ellipse mode. Use 'center', 'radius', 'corner', or 'corners'.");
+        }
+    };
+
+    $.currentImageMode = 'corner';
+
+    $.imageMode = function (mode) {
+        if (mode === 'corner' || mode === 'corners' || mode === 'center') {
+            $.currentImageMode = mode;
+        } else {
+            console.error("Invalid image mode. Use 'corner', 'corners', or 'center'.");
+        }
+    };
+
     $.defineConstant('DEGREES', 'degrees');
     $.defineConstant('RADIANS', 'radians');
 
