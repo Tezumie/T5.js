@@ -1,49 +1,82 @@
-let bgColor = 0;
-let circleColor = [255, 0, 0];
-let circleSize = 50;
-let circleX, circleY;
+setup = function () {
+    createCanvas(800, 800)
+    background(255)
+    strokeWeight(11)
+    // Ellipse mode center (default)
+    ellipseMode("center")
+    fill(255, 0, 0)
+    ellipse(200, 200, 100, 50)
 
-function setup() {
-  createCanvas(windowWidth, windowHeight);
-  circleX = width / 2;
-  circleY = height / 2;
-  noStroke();
-  
+    // Ellipse mode radius
+    ellipseMode("radius")
+    fill(0, 255, 0)
+    ellipse(400, 200, 50, 25)
+
+    // Ellipse mode corner
+    ellipseMode("corner")
+    fill(0, 0, 255)
+    ellipse(600, 200, 100, 50)
+
+    // Ellipse mode corners
+    ellipseMode("corners")
+    fill(255, 255, 0)
+    ellipse(100, 400, 200, 450)
+
+    // Arc with center mode
+    ellipseMode("center")
+    fill(255, 0, 255)
+    arc(400, 400, 100, 100, 0, Math.PI / 2, PIE)
+    // Circle with radius mode
+    ellipseMode("radius")
+    fill(0, 255, 255)
+    circle(600, 400, 50)
 }
 
-function draw() {
-  background(bgColor);
-  fill(circleColor);
-  ellipse(circleX, circleY, circleSize);
-}
+// let bgColor = 0;
+// let circleColor = [255, 0, 0];
+// let circleSize = 50;
+// let circleX, circleY;
 
-function keyPressed() {
-  if (key === 'r' || key === 'R') {
-    circleColor = [255, 0, 0];
-  } else if (key === 'g' || key === 'G') {
-    circleColor = [0, 255, 0];
-  } else if (key === 'b' || key === 'B') {
-    circleColor = [0, 0, 255];
-  } else if (key === ' ') {
-    bgColor = bgColor === 0 ? 255 : 0;
-  }
-}
+// function setup() {
+//   createCanvas(windowWidth, windowHeight);
+//   circleX = width / 2;
+//   circleY = height / 2;
+//   noStroke();
 
-function mousePressed() {
-  circleX = mouseX;
-  circleY = mouseY;
-}
+// }
 
-function mouseMoved() {
-  circleX = mouseX;
-  circleY = mouseY;
-}
+// function draw() {
+//   background(bgColor);
+//   fill(circleColor);
+//   ellipse(circleX, circleY, circleSize);
+// }
 
-function mouseWheel(event) {
-  circleSize += event.deltaY > 0 ? -5 : 5;
-  circleSize = constrain(circleSize, 10, 200);
-}
+// function keyPressed() {
+//   if (key === 'r' || key === 'R') {
+//     circleColor = [255, 0, 0];
+//   } else if (key === 'g' || key === 'G') {
+//     circleColor = [0, 255, 0];
+//   } else if (key === 'b' || key === 'B') {
+//     circleColor = [0, 0, 255];
+//   } else if (key === ' ') {
+//     bgColor = bgColor === 0 ? 255 : 0;
+//   }
+// }
 
+// function mousePressed() {
+//   circleX = mouseX;
+//   circleY = mouseY;
+// }
+
+// function mouseMoved() {
+//   circleX = mouseX;
+//   circleY = mouseY;
+// }
+
+// function mouseWheel(event) {
+//   circleSize += event.deltaY > 0 ? -5 : 5;
+//   circleSize = constrain(circleSize, 10, 200);
+// }
 
 // let gfx1, gfx2, gfx3;
 
@@ -179,4 +212,3 @@ function mouseWheel(event) {
 //         }
 //     }
 // }
-
