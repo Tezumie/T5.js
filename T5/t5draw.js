@@ -20,6 +20,25 @@ T5.addOns.draw = ($, p) => {
                 return;
             }
 
+            switch ($.currentRectMode) {
+                case 'corner':
+                    break;
+                case 'corners':
+                    w = w - x;
+                    h = h - y;
+                    break;
+                case 'center':
+                    x = x - w / 2;
+                    y = y - h / 2;
+                    break;
+                case 'radius':
+                    x = x - w;
+                    y = y - h;
+                    w = 2 * w;
+                    h = 2 * h;
+                    break;
+            }
+
             if ($.borderRadii.length > 0) {
                 $.beginShape();
                 $.vertex(x, y);
@@ -62,6 +81,25 @@ T5.addOns.draw = ($, p) => {
                 return;
             }
 
+            switch ($.currentEllipseMode) {
+                case 'corner':
+                    x = x + w / 2;
+                    y = y + h / 2;
+                    break;
+                case 'corners':
+                    w = w - x;
+                    h = h - y;
+                    x = x + w / 2;
+                    y = y + h / 2;
+                    break;
+                case 'center':
+                    break;
+                case 'radius':
+                    w = 2 * w;
+                    h = 2 * h;
+                    break;
+            }
+
             [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
             if ($.noAlphaStroke && !$.noAlphaFill) {
                 $.fillEllipse(x, y, w, h);
@@ -78,8 +116,8 @@ T5.addOns.draw = ($, p) => {
         }
     };
 
-    $.circle = function (x, y, w, h = w) {
-        $.ellipse(x, y, w, h);
+    $.circle = function (x, y, d) {
+        $.ellipse(x, y, d, d);
     };
 
     $.fillEllipse = function (x, y, w, h = w) {
@@ -88,6 +126,57 @@ T5.addOns.draw = ($, p) => {
             $.context.beginPath();
             $.context.ellipse(x, y, w / 2, h / 2, 0, 0, Math.PI * 2);
             $.context.fill();
+        }
+    };
+
+    $.defineConstant('CHORD', 'chord');
+    $.defineConstant('PIE', 'pie');
+
+    $.arc = function (x, y, w, h, start, stop, mode = 'open', counterclockwise = false) {
+        if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            switch ($.currentEllipseMode) {
+                case 'corner':
+                    x = x + w / 2;
+                    y = y + h / 2;
+                    break;
+                case 'corners':
+                    w = w - x;
+                    h = h - y;
+                    x = x + w / 2;
+                    y = y + h / 2;
+                    break;
+                case 'center':
+                    break;
+                case 'radius':
+                    w = 2 * w;
+                    h = 2 * h;
+                    break;
+            }
+
+            [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+            start = $.convertAngle(start);
+            stop = $.convertAngle(stop);
+
+            $.context.beginPath();
+            $.context.ellipse(x, y, w / 2, h / 2, 0, start, stop, counterclockwise);
+
+            if (mode === 'chord') {
+                $.context.lineTo(x + (w / 2) * Math.cos(start), y + (h / 2) * Math.sin(start));
+            } else if (mode === 'pie') {
+                $.context.lineTo(x, y);
+                $.context.closePath();
+            }
+
+            if (!$.noAlphaFill) {
+                $.context.fill();
+            }
+            if (!$.noAlphaStroke) {
+                $.context.stroke();
+            }
         }
     };
 
@@ -371,27 +460,6 @@ T5.addOns.draw = ($, p) => {
         [radius] = $.scaleT5Coords([radius]);
         return radius;
     }
-
-    $.arc = function (x, y, radius, startAngle, endAngle, counterclockwise = false) {
-        if ($.context) {
-            if ($.noAlphaFill && $.noAlphaStroke) {
-                return;
-            }
-
-            [x, y, radius] = $.scaleT5Coords([x, y, radius]);
-            startAngle = $.convertAngle(startAngle);
-            endAngle = $.convertAngle(endAngle);
-
-            $.context.beginPath();
-            $.context.arc(x, y, radius, startAngle, endAngle, counterclockwise);
-            if (!$.noAlphaFill) {
-                $.context.fill();
-            }
-            if (!$.noAlphaStroke) {
-                $.context.stroke();
-            }
-        }
-    };
 
     $.point = function (x, y) {
         if ($.context) {
