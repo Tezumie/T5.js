@@ -102,6 +102,20 @@ sketch.draw = function() {
 
 ```
 
+### Physics
+
+![gradient functions](images/physics.png)
+
+The T5.js physics add on is still in development, but you can already use it for simple experiments. There is demo project in the examples folder.
+
+T5.js physics is powered by [matter-js](https://brm.io/matter-js/)
+
+To Use physics you will have to include Matter-js in your project dependencies, by either downloading it or via cdn;
+
+```html
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+```
+
 ### Contributing
 
 We welcome contributions to T5.js! If you have suggestions, bug reports, or would like to contribute code, please open an issue or submit a pull request on GitHub.
