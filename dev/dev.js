@@ -1,86 +1,116 @@
-let mouseShape
+let balls;
+let constraints;
+let numBalls = 5;
+let ballRadius = 30;
+let stringLength = 250;
+let draggingBall = null;
+
 function setup() {
     createCanvas(window.innerWidth, window.innerWidth);
-    flexibleCanvas(800)//makes the project dimension agnostic
+    flexibleCanvas(800);
+    worldGravity(2.0);
+    balls = new PhysicsGroup(); // create groups to manage physics objects
+    constraints = new PhysicsGroup();
+    let startX = width / 2 - ((numBalls - 1) * ballRadius);
+    frameRate(60);
 
-    // Make some random shapes
-    for (let i = 0; i < 30; i++) {
-        let shapes = random(['ellipse', 'rect', 'polygon'])
-        if (shapes == 'ellipse') {
-            shapes = physicsEllipse(random(width), random(height / 2), random(50, 100));
-        }
-        else if (shapes == 'rect') {
-            shapes = physicsRect(random(width), random(height / 2), random(50, 100), random(30, 50));
-        } else {
-            shapes = physicsPolygon(random(width), random(height / 2), 50, int(random(3, 7)));
-        }
-        shapes.fill = '#14151f69'
-        shapes.stroke = '#bababa'
-        shapes.borderRadius = int(random(0, 6))
-        shapes.debug = true
+    for (let i = 0; i < numBalls; i++) {
+        let x = startX + i * (ballRadius * 2);
+        let y = height / 1.5;
+
+        let ball = physicsEllipse(x, y, ballRadius * 2);
+        ball.restitution = 1.15; // Ball bounciness
+        ball.fill = color('#14151f69'); // Use color function
+        ball.stroke = '#bababa';
+        ball.width = 5;
+        ball.hit = 0; // create custom property for a timer
+        balls.add(ball);
+
+        let anchor = { x: x, y: y - stringLength };
+        let constraint = createConstraint(ball.body, anchor, { length: stringLength, stiffness: 0.2, damping: 0.2 });
+        constraints.add(constraint);
     }
 
-    // Add static rectangles for boundaries
-    physicsRect(width / 2, 0, width, 40, {
-        isStatic: true,
-        fill: '#14151f69',
-        stroke: '#bababa'
-    });
-    physicsRect(0, height / 2, 40, height, {
-        isStatic: true,
-        fill: '#14151f69',
-        stroke: '#bababa'
-    });
-    physicsRect(width, height / 2, 40, height, {
-        isStatic: true,
-        fill: '#14151f69',
-        stroke: '#bababa'
-    });
-    let floor = physicsRect(width / 2, height, width, 40, {
-        isStatic: true
-    });
-    floor.fill = color(72, 145, 255, 143)
-    floor.stroke = '#bababa'
-    worldGravity(1.5);
-
-    // Mouse object
-    mouseShape = physicsEllipse(width / 2, height / 2, 70)
+    // Pull the first ball to the left
+    balls[0].setPosition(balls[0].x - 150, balls[0].y - 50);
 }
 
 function draw() {
     background('#14151f');
+
+    for (let i = 0; i < balls.length; i++) {
+        let ball = balls[i];
+        let constraint = constraints[i];
+
+        // Adjust constraint stiffness and damping based on distance (springy rope)
+        let distance = dist(ball.x, ball.y, constraint.pointB.x, constraint.pointB.y);
+        if (distance > stringLength) {
+            constraint.stiffness = 0.2;
+            constraint.length = stringLength;
+            constraint.damping = 0.2; // Increase damping to reduce oscillations
+        } else {
+            constraint.stiffness = 0.000001;
+            constraint.damping = 0.000005; // Decrease damping to allow more oscillations
+        }
+
+        // Calculate stroke color based on distance
+        let maxDistance = stringLength * 1.5;
+        let minDistance = 50;
+        let colorFactor = map(distance, minDistance, maxDistance, 0, 1.5);
+        let strokeColor = lerpColor(color(0, 255, 255), color(255, 200, 0), colorFactor);
+        let fillColor = lerpColor(color(0, 255, 255, 50), color(255, 200, 0, 100), colorFactor);
+
+        constraint.fill = '#14151f';
+        constraint.stroke = strokeColor;
+        constraint.width = 6;
+        constraint.borderRadius = [0, 3, 3, 0];
+
+        // Update ball color based on hit timer
+        if (ball.hit > 0) {
+            ball.hit--;
+            ball.fill = lerpColor(fillColor, color(255, 0, 0, 100), ball.hit / frameRate()); // Adjust 60 to change duration
+        } else {
+            ball.fill = fillColor;
+        }
+
+        ball.stroke = strokeColor;
+    }
+
+    // Check collisions and update hit timer
+    for (let i = 0; i < balls.length; i++) {
+        for (let j = i + 1; j < balls.length; j++) {
+            if (balls[i].collidesWith(balls[j])) {
+                balls[i].hit = frameRate(); // Set hit timer to 60 frames
+                balls[j].hit = frameRate(); // Set hit timer to 60 frames
+            }
+        }
+    }
+
+    fill(170, 170, 170, 10);
+    stroke(255, 50);
+    ellipse(mouseX, mouseY, 60);
+
+    // Update physics world
     updatePhysics();
-
-    // Display the number of objects
-    fill('#bababa');
-    noStroke()
-    textSize(20);
-    text(`Objects: ${physicsObjects.length}`, 40, 50);
-
-    fill('#14151f69');
-    stroke('#bababa62')
-    //Follow the mouse
-    mouseShape.moveTo(mouseX, mouseY, 0.5);
 }
 
 function mousePressed() {
-    // Add a new irregular shape at the mouse position when clicked
-    physicsBeginShape();
-    let numVertices = int(random(3, 9));
-    for (let i = 0; i < numVertices; i++) {
-        let angle = TWO_PI / numVertices * i;
-        let x = mouseX + cos(angle) * random(20, 70);
-        let y = mouseY + sin(angle) * random(20, 70);
-        physicsVertex(x, y);
+    for (let i = 0; i < balls.length; i++) {
+        let ball = balls[i];
+        let d = dist(mouseX, mouseY, ball.x, ball.y);
+        if (d < ballRadius) {
+            draggingBall = ball;
+            break;
+        }
     }
-    let shape = physicsEndShape();
-    shape.fill = color(102, 255, 72, 103)
-    shape.stroke = '#bababa'
-    shape.debug = true
+}
 
-    //Add a polygon at mouse position
-    shape = physicsPolygon(mouseX, mouseY, 50, int(random(3, 7)));
-    shape.debug = true
-    shape.fill = color(72, 145, 255, 103)
-    shape.stroke = '#bababa'
+function mouseDragged() {
+    if (draggingBall) {
+        draggingBall.moveTo(mouseX, mouseY);
+    }
+}
+
+function mouseReleased() {
+    draggingBall = null;
 }
