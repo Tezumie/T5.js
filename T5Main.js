@@ -1504,12 +1504,19 @@ T5.addOns.draw = ($, p) => {
 
     $.borderRadii = [];
 
-    $.borderRadius = function (...radii) {
-        if (radii == null || radii == undefined || radii == 'none') {
-            $.borderRadii = [];
+$.borderRadius = function (...radii) {
+    if (radii == null || radii == undefined || radii == 'none') {
+        $.borderRadii = [];
+    } else {
+        if (Array.isArray(radii[0])) {
+            // If the first argument is an array, use it directly
+            $.borderRadii = radii[0];
+        } else {
+            // Otherwise, use the arguments as an array
+            $.borderRadii = radii;
         }
-        $.borderRadii = radii;
-    };
+    }
+};
     $.noBorderRadius = function () {
         $.borderRadii = [];
     };
@@ -2213,169 +2220,169 @@ T5.addOns.math(T5.prototype, T5.prototype);
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-    $.defineConstant('NORMAL', 'normal');
-    $.defineConstant('ITALIC', 'italic');
-    $.defineConstant('BOLD', 'bold');
-    $.defineConstant('BOLDITALIC', 'italic bold');
-    $.defineConstant('CENTER', 'center');
-    $.defineConstant('MIDDLE', 'middle');
-    $.defineConstant('LEFT', 'left');
-    $.defineConstant('RIGHT', 'right');
-    $.defineConstant('TOP', 'top');
-    $.defineConstant('BOTTOM', 'bottom');
-    $.defineConstant('BASELINE', 'alphabetic');
-    $.defineConstant('WORD', 'word');
-    $.defineConstant('CHAR', 'char');
-    $.defineConstant('WRAP', 'wrap');
-    $.defineConstant('NOWRAP', 'nowrap');
+  $.defineConstant('NORMAL', 'normal');
+  $.defineConstant('ITALIC', 'italic');
+  $.defineConstant('BOLD', 'bold');
+  $.defineConstant('BOLDITALIC', 'italic bold');
+  $.defineConstant('CENTER', 'center');
+  $.defineConstant('MIDDLE', 'middle');
+  $.defineConstant('LEFT', 'left');
+  $.defineConstant('RIGHT', 'right');
+  $.defineConstant('TOP', 'top');
+  $.defineConstant('BOTTOM', 'bottom');
+  $.defineConstant('BASELINE', 'alphabetic');
+  $.defineConstant('WORD', 'word');
+  $.defineConstant('CHAR', 'char');
+  $.defineConstant('WRAP', 'wrap');
+  $.defineConstant('NOWRAP', 'nowrap');
 
-    $.textSizeVal = 12;
-    $.textAlignH = 'left';
-    $.textAlignV = 'alphabetic';
-    $.textLeadingVal = $.textSizeVal * 1.2;
-    $.textFontVal = 'sans-serif';
-    $.textStyleVal = 'normal';
-    $.textWrapVal = 'wrap';
-    $.textFillColor = '#000000';
-    $.textStrokeColor = '#000000';
+  $.textSizeVal = 12;
+  $.textAlignH = 'left';
+  $.textAlignV = 'alphabetic';
+  $.textLeadingVal = $.textSizeVal * 1.2;
+  $.textFontVal = 'sans-serif';
+  $.textStyleVal = 'normal';
+  $.textWrapVal = 'wrap';
+  $.textFillColor = '#000000';
+  $.textStrokeColor = '#000000';
 
-    $.textSize = function (size) {
-        [size] = $.scaleT5Coords([size]);
-        if (size !== undefined) {
-            $.textSizeVal = size;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textSizeVal;
-    };
-
-    $.textFont = function (font) {
-        if (font instanceof T5Font) {
-            font = font.family;
-        }
-        if (font !== undefined) {
-            $.textFontVal = font;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textFontVal;
-    };
-
-    $.textStyle = function (style) {
-        if (style !== undefined) {
-            $.textStyleVal = style;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textStyleVal;
-    };
-
-    $.textAlign = function (hAlign, vAlign) {
-        if (hAlign !== undefined) {
-            $.textAlignH = hAlign;
-        }
-        if (vAlign !== undefined) {
-            $.textAlignV = vAlign;
-        }
-        $.context.textAlign = $.textAlignH;
-        $.context.textBaseline = $.textAlignV;
-    };
-
-    $.textLeading = function (leading) {
-        [leading] = $.scaleT5Coords([leading]);
-        if (leading !== undefined) {
-            $.textLeadingVal = leading;
-        }
-        return $.textLeadingVal;
-    };
-
-    $.textWrap = function (wrapType) {
-        if (wrapType !== undefined) {
-            $.textWrapVal = wrapType;
-        }
-        return $.textWrapVal;
-    };
-
-    $.textWidth = function (str) {
-        return $.context.measureText(str).width;
-    };
-
-    $.textAscent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("M").actualBoundingBoxAscent;
-    };
-
-    $.textDescent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("g").actualBoundingBoxDescent;
-    };
-
-    $.text = function (str, x, y, maxWidth) {
-        [x, y] = $.scaleT5Coords([x, y]);
-        const lines = str.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
-                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
-            } else {
-                if ($.context.strokeStyle && !$.noAlphaStroke) {
-                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
-                }
-                if ($.context.fillStyle && !$.noAlphaFill) {
-                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-                }
-            }
-        }
-    };
-
-    $.drawWrappedText = function (text, x, y, maxWidth) {
-        let words = text.split(' ');
-        let line = '';
-        for (let i = 0; i < words.length; i++) {
-            let testLine = line + words[i] + ' ';
-            let metrics = $.context.measureText(testLine);
-            let testWidth = metrics.width;
-            if (testWidth > maxWidth && i > 0) {
-                if ($.context.strokeStyle && !$.noAlphaStroke) {
-                    $.context.strokeText(line, x, y);
-                }
-                if ($.context.fillStyle && !$.noAlphaFill) {
-                    $.context.fillText(line, x, y);
-                }
-                line = words[i] + ' ';
-                y += $.textLeadingVal;
-            } else {
-                line = testLine;
-            }
-        }
-        if ($.context.strokeStyle) {
-            $.context.strokeText(line, x, y);
-        }
-        if ($.context.fillStyle) {
-            $.context.fillText(line, x, y);
-        }
-    };
-
-    class T5Font {
-        constructor(font, family) {
-            this.font = font;
-            this.family = family;
-        }
+  $.textSize = function (size) {
+    [size] = $.scaleT5Coords([size]);
+    if (size !== undefined) {
+      $.textSizeVal = size;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
     }
+    return $.textSizeVal;
+  };
 
-    $.loadFont = function (path, callback) {
-        window.t5PreloadCount++;
-        const family = 'CustomFont' + window.t5PreloadCount;
-        const font = new FontFace(family, `url(${path})`);
-        const t5Font = new T5Font(font, family);
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            window.t5PreloadDone++;
-            if (callback) {
-                callback(t5Font);
-            }
-        }).catch((error) => {
-            window.t5PreloadDone++;
-            console.error(`Failed to load font at path: ${path}. Error: ${error}`);
-        });
-        return t5Font;
-    };
+  $.textFont = function (font) {
+    if (font instanceof T5Font) {
+      font = font.family;
+    }
+    if (font !== undefined) {
+      $.textFontVal = font;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textFontVal;
+  };
+
+  $.textStyle = function (style) {
+    if (style !== undefined) {
+      $.textStyleVal = style;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textStyleVal;
+  };
+
+  $.textAlign = function (hAlign, vAlign) {
+    if (hAlign !== undefined) {
+      $.textAlignH = hAlign;
+    }
+    if (vAlign !== undefined) {
+      $.textAlignV = vAlign;
+    }
+    $.context.textAlign = $.textAlignH;
+    $.context.textBaseline = $.textAlignV;
+  };
+
+  $.textLeading = function (leading) {
+    [leading] = $.scaleT5Coords([leading]);
+    if (leading !== undefined) {
+      $.textLeadingVal = leading;
+    }
+    return $.textLeadingVal;
+  };
+
+  $.textWrap = function (wrapType) {
+    if (wrapType !== undefined) {
+      $.textWrapVal = wrapType;
+    }
+    return $.textWrapVal;
+  };
+
+  $.textWidth = function (str) {
+    return $.context.measureText(str).width;
+  };
+
+  $.textAscent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("M").actualBoundingBoxAscent;
+  };
+
+  $.textDescent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("g").actualBoundingBoxDescent;
+  };
+
+  $.text = function (str, x, y, maxWidth) {
+    [x, y] = $.scaleT5Coords([x, y]);
+    const lines = str.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+        $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+      } else {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
+          $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
+        }
+      }
+    }
+  };
+
+  $.drawWrappedText = function (text, x, y, maxWidth) {
+    let words = text.split(' ');
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      let testLine = line + words[i] + ' ';
+      let metrics = $.context.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxWidth && i > 0) {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
+          $.context.strokeText(line, x, y);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(line, x, y);
+        }
+        line = words[i] + ' ';
+        y += $.textLeadingVal;
+      } else {
+        line = testLine;
+      }
+    }
+    if ($.context.strokeStyle) {
+      $.context.strokeText(line, x, y);
+    }
+    if ($.context.fillStyle) {
+      $.context.fillText(line, x, y);
+    }
+  };
+
+  class T5Font {
+    constructor(font, family) {
+      this.font = font;
+      this.family = family;
+    }
+  }
+
+  $.loadFont = function (path, callback) {
+    window.t5PreloadCount++;
+    const family = 'CustomFont' + window.t5PreloadCount;
+    const font = new FontFace(family, `url(${path})`);
+    const t5Font = new T5Font(font, family);
+    font.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+      window.t5PreloadDone++;
+      if (callback) {
+        callback(t5Font);
+      }
+    }).catch((error) => {
+      window.t5PreloadDone++;
+      console.error(`Failed to load font at path: ${path}. Error: ${error}`);
+    });
+    return t5Font;
+  };
 
 };
 
@@ -2959,7 +2966,7 @@ T5.addOns.dom = ($, p, globalScope) => {
         };
     }
 
-
+  
 
     class T5Dom {
         constructor() {
@@ -3448,7 +3455,7 @@ T5.addOns.input = ($, p, globalScope) => {
     if (!('noCursor' in window)) {
         globalScope.noCursor = () => t5Input.noCursor();
     }
-
+    
     $.disableContextMenu = function () {
         if ($.canvas) {
             $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
@@ -3869,10 +3876,10 @@ T5.addOns.art = ($, p) => {
         [x, y] = $.scaleT5Coords([x, y]);
         [x, y] = [Math.floor(x), Math.floor(y)];
 
-        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
-            console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
-            return;
-        }
+    if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+        console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
+        return;
+    }
 
         const fillColor = handleColorArgument(colorArgs);
         if (!fillColor) {
@@ -3942,7 +3949,6 @@ T5.addOns.art = ($, p) => {
 };
 
 T5.addOns.art(T5.prototype, T5.prototype);
-
 window.decomp = {
     makeCCW: function (vertices) { return vertices; },
     removeCollinearPoints: function (vertices) { return vertices; },
@@ -4010,14 +4016,16 @@ T5.addOns.physics = ($, p, globalScope) => {
         World = Matter.World,
         Bodies = Matter.Bodies,
         Body = Matter.Body,
-        Composite = Matter.Composite;
+        Composite = Matter.Composite,
+        Events = Matter.Events,
+        Collision = Matter.Collision,
+        Constraint = Matter.Constraint;
 
     // Create Matter.js engine and world
     const engine = Engine.create();
     const world = engine.world;
 
     $.physicsObjects = [];
-
     class PhysicsObject {
         constructor(body, options = {}) {
             this.body = body;
@@ -4026,16 +4034,21 @@ T5.addOns.physics = ($, p, globalScope) => {
             this._stroke = options.stroke || 'rgba(0, 0, 0, 1)';
             this._static = options.isStatic || false;
             this.debug = options.debug || false;
+            this.rotationEnabled = options.rotationEnabled !== undefined ? options.rotationEnabled : true;
             World.add(world, this.body);
             $.physicsObjects.push(this);
             this.borderRadius = 0;
             this.strokeWeight = 1;
-            // Store initial dimensions for rectangles
+            this._maxSpeedX = Infinity;
+            this._maxSpeedY = Infinity;
             if (this.body.label === 'rectangle') {
                 this.width = options.width;
                 this.height = options.height;
             }
+            this.x = $.inverseScaleT5Coord(this.pos.x);
+            this.y = $.inverseScaleT5Coord(this.pos.y);
         }
+
         moveTo(targetX, targetY, followStrength = 0.1) {
             const scaledTargetX = $.scaleT5Coord(targetX);
             const scaledTargetY = $.scaleT5Coord(targetY);
@@ -4055,6 +4068,32 @@ T5.addOns.physics = ($, p, globalScope) => {
             Body.setPosition(this.body, { x: scaledX, y: scaledY });
         }
 
+        applyForce(force) {
+            Body.applyForce(this.body, this.body.position, force);
+            this._applySpeedLimits();
+        }
+
+        _applySpeedLimits() {
+            const velocity = this.body.velocity;
+            const newVelocity = {
+                x: Math.sign(velocity.x) * Math.min(Math.abs(velocity.x), this._maxSpeedX),
+                y: Math.sign(velocity.y) * Math.min(Math.abs(velocity.y), this._maxSpeedY)
+            };
+            Body.setVelocity(this.body, newVelocity);
+        }
+
+        collidesWith(otherBody) {
+            return Collision.collides(this.body, otherBody.body);
+        }
+
+        remove() {
+            World.remove(world, this.body);
+            const index = $.physicsObjects.indexOf(this);
+            if (index !== -1) {
+                $.physicsObjects.splice(index, 1);
+            }
+        }
+
         get pos() {
             return this.body.position;
         }
@@ -4068,7 +4107,9 @@ T5.addOns.physics = ($, p, globalScope) => {
         }
 
         set angle(newAngle) {
-            Body.setAngle(this.body, newAngle);
+            if (this.rotationEnabled) {
+                Body.setAngle(this.body, newAngle);
+            }
         }
 
         get static() {
@@ -4096,9 +4137,109 @@ T5.addOns.physics = ($, p, globalScope) => {
             this._stroke = color.toString();
         }
 
+        get velocity() {
+            return this.body.velocity;
+        }
+
+        set velocity(newVelocity) {
+            Body.setVelocity(this.body, {
+                x: Math.sign(newVelocity.x) * Math.min(Math.abs(newVelocity.x), this._maxSpeedX),
+                y: Math.sign(newVelocity.y) * Math.min(Math.abs(newVelocity.y), this._maxSpeedY)
+            });
+        }
+
+        get density() {
+            return this.body.density;
+        }
+
+        set density(newDensity) {
+            Body.setDensity(this.body, newDensity);
+        }
+
+        get mass() {
+            return this.body.mass;
+        }
+
+        set mass(newMass) {
+            Body.setMass(this.body, newMass);
+        }
+
+        get friction() {
+            return this.body.friction;
+        }
+
+        set friction(newFriction) {
+            this.body.friction = newFriction;
+        }
+
+        get frictionAir() {
+            return this.body.frictionAir;
+        }
+
+        set frictionAir(newFrictionAir) {
+            this.body.frictionAir = newFrictionAir;
+        }
+
+        get restitution() {
+            return this.body.restitution;
+        }
+
+        set restitution(newRestitution) {
+            this.body.restitution = newRestitution;
+        }
+
+        get gravityScale() {
+            return this.body.gravityScale;
+        }
+
+        set gravityScale(newGravityScale) {
+            this.body.gravityScale = newGravityScale;
+        }
+
+        get speed() {
+            const that = this;
+            return {
+                get x() {
+                    return that.body.velocity.x;
+                },
+                set x(value) {
+                    that.body.velocity.x = Math.sign(value) * Math.min(Math.abs(value), that._maxSpeedX);
+                },
+                get y() {
+                    return that.body.velocity.y;
+                },
+                set y(value) {
+                    that.body.velocity.y = Math.sign(value) * Math.min(Math.abs(value), that._maxSpeedY);
+                }
+            };
+        }
+
+        get maxSpeed() {
+            const that = this;
+            return {
+                get x() {
+                    return that._maxSpeedX;
+                },
+                set x(value) {
+                    that._maxSpeedX = value;
+                },
+                get y() {
+                    return that._maxSpeedY;
+                },
+                set y(value) {
+                    that._maxSpeedY = value;
+                }
+            };
+        }
+
         update() {
             this.pos = this.body.position;
-            this.angle = this.body.angle;
+            this.x = $.inverseScaleT5Coord(this.pos.x);
+            this.y = $.inverseScaleT5Coord(this.pos.y);
+            if (this.rotationEnabled) {
+                this.angle = this.body.angle;
+            }
+            this._applySpeedLimits();
         }
 
         display() {
@@ -4108,14 +4249,15 @@ T5.addOns.physics = ($, p, globalScope) => {
             $.stroke(this.stroke);
             $.strokeWeight(this.strokeWeight);
             $.borderRadius(this.borderRadius);
-            if (this.body.label === 'ellipse') {
+            if (this.rotationEnabled) {
                 $.rotate(this.angle);
+            }
+            if (this.body.label === 'ellipse') {
                 $.ellipse(0, 0, $.inverseScaleT5Coord(this.body.circleRadius * 2));
                 if (this.debug) {
                     $.line(0, 0, 0, -$.inverseScaleT5Coord(this.body.circleRadius));
                 }
             } else if (this.body.label === 'rectangle') {
-                $.rotate(this.angle);
                 $.rectMode($.CENTER);
                 $.rect(0, 0, $.inverseScaleT5Coord(this.width), $.inverseScaleT5Coord(this.height));
                 if (this.debug) {
@@ -4132,23 +4274,115 @@ T5.addOns.physics = ($, p, globalScope) => {
                     const firstVertex = this.body.vertices[0];
                     $.line(0, 0, $.inverseScaleT5Coord(firstVertex.x - this.pos.x), $.inverseScaleT5Coord(firstVertex.y - this.pos.y));
                 }
-
             }
             $.pop();
         }
     }
 
+
+
+    class PhysicsGroup {
+        constructor() {
+            this.objects = [];
+            return new Proxy(this, {
+                get: (target, prop) => {
+                    if (typeof prop === 'string' && !isNaN(prop)) {
+                        return target.objects[prop];
+                    } else if (prop in target) {
+                        return target[prop];
+                    } else {
+                        return undefined;
+                    }
+                }
+            });
+        }
+
+        add(object) {
+            this.objects.push(object);
+        }
+
+        remove(object) {
+            object.remove();
+            const index = this.objects.indexOf(object);
+            if (index !== -1) {
+                this.objects.splice(index, 1);
+            }
+        }
+
+        checkCollisions(target) {
+            for (let object of this.objects) {
+                if (object.collidesWith(target)) {
+                    return object;
+                }
+            }
+            return null;
+        }
+
+        update() {
+            for (let object of this.objects) {
+                object.update();
+                object.display();
+            }
+        }
+
+        get length() {
+            return this.objects.length;
+        }
+    }
+    class Camera {
+        constructor(target, offsetX = 0, offsetY = 0) {
+            this.target = target;
+            this.offsetX = offsetX;
+            this.offsetY = offsetY;
+        }
+
+        apply() {
+            $.translate(-this.target.pos.x + this.offsetX, -this.target.pos.y + this.offsetY);
+        }
+    }
+
+    function scaleOptions(options = {}) {
+        const scaledOptions = { ...options };
+        if (scaledOptions.stiffness !== undefined) {
+            scaledOptions.stiffness = $.scaleT5Coord(scaledOptions.stiffness);
+        }
+        if (scaledOptions.damping !== undefined) {
+            scaledOptions.damping = $.scaleT5Coord(scaledOptions.damping);
+        }
+        if (scaledOptions.restitution !== undefined) {
+            scaledOptions.restitution = $.scaleT5Coord(scaledOptions.restitution);
+        }
+        if (scaledOptions.length !== undefined) {
+            scaledOptions.length = $.scaleT5Coord(scaledOptions.length);
+        }
+        if (scaledOptions.mass !== undefined) {
+            scaledOptions.mass = $.scaleT5Coord(scaledOptions.mass);
+        }
+        if (scaledOptions.angle !== undefined) {
+            scaledOptions.angle = $.scaleT5Coord(scaledOptions.angle);
+        }
+        if (scaledOptions.vertices !== undefined && Array.isArray(scaledOptions.vertices)) {
+            scaledOptions.vertices = scaledOptions.vertices.map(vertex => {
+                return { x: $.scaleT5Coord(vertex.x), y: $.scaleT5Coord(vertex.y) };
+            });
+        }
+        return scaledOptions;
+    }
+
+
     function physicsEllipse(x, y, radius, options = {}) {
         [x, y, radius] = $.scaleT5Coords([x, y, radius]);
         radius /= 2;
-        const body = Bodies.circle(x, y, radius, options);
-        return new PhysicsObject(body, { ...options, label: 'ellipse' });
+        const scaledOptions = scaleOptions(options);
+        const body = Bodies.circle(x, y, radius, scaledOptions);
+        return new PhysicsObject(body, { ...scaledOptions, label: 'ellipse' });
     }
 
     function physicsRect(x, y, width, height, options = {}) {
         [x, y, width, height] = $.scaleT5Coords([x, y, width, height]);
-        const body = Bodies.rectangle(x, y, width, height, options);
-        return new PhysicsObject(body, { ...options, label: 'rectangle', width, height });
+        const scaledOptions = scaleOptions(options);
+        const body = Bodies.rectangle(x, y, width, height, scaledOptions);
+        return new PhysicsObject(body, { ...scaledOptions, label: 'rectangle', width, height });
     }
 
     function physicsPolygon(x, y, radius, verts, options = {}) {
@@ -4162,8 +4396,9 @@ T5.addOns.physics = ($, p, globalScope) => {
             const vy = y + Math.sin(angle) * radius;
             vertices.push({ x: vx, y: vy });
         }
-        const body = Bodies.fromVertices(x, y, [vertices], options, true);
-        return new PhysicsObject(body, { ...options, label: 'fromVertices' });
+        const scaledOptions = scaleOptions(options);
+        const body = Bodies.fromVertices(x, y, [vertices], scaledOptions, true);
+        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
     }
 
     function physicsStar(x, y, radius1, radius2, points, options = {}) {
@@ -4178,8 +4413,9 @@ T5.addOns.physics = ($, p, globalScope) => {
             const vy = y + Math.sin(angle) * radius;
             vertices.push({ x: vx, y: vy });
         }
-        const body = Bodies.fromVertices(x, y, [vertices], options, true);
-        return new PhysicsObject(body, { ...options, label: 'fromVertices' });
+        const scaledOptions = scaleOptions(options);
+        const body = Bodies.fromVertices(x, y, [vertices], scaledOptions, true);
+        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
     }
 
     let vertices = [];
@@ -4194,11 +4430,183 @@ T5.addOns.physics = ($, p, globalScope) => {
     }
 
     function physicsEndShape(options = {}) {
-        const body = Bodies.fromVertices(vertices[0].x, vertices[0].y, [vertices], options, true);
-        return new PhysicsObject(body, { ...options, label: 'fromVertices' });
+        const scaledOptions = scaleOptions(options);
+        const body = Bodies.fromVertices(vertices[0].x, vertices[0].y, [vertices], scaledOptions, true);
+        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
+    }
+
+    $.physicsConstraints = [];
+
+    class PhysicsConstraint {
+        constructor(constraint, options = {}) {
+            this.constraint = constraint;
+            this._stroke = options.stroke || 'rgba(0, 0, 0, 1)';
+            this._fill = options.fill || 'rgba(255, 255, 255, 0.50)';
+            this._borderRadius = options.borderRadius || 0;
+            this._strokeWeight = options.strokeWeight || 1;
+            this._width = options.width || 1;
+            $.physicsConstraints.push(this);
+        }
+
+        display() {
+            const pointA = this.constraint.bodyA.position;
+            const pointB = this.constraint.pointB;
+            const distance = dist(pointA.x, pointA.y, pointB.x, pointB.y);
+            const angle = atan2(pointB.y - pointA.y, pointB.x - pointA.x);
+            let w = (this.width)
+            $.push();
+            $.translate(pointA.x, pointA.y);
+            $.rotate(angle);
+            $.borderRadius(this._borderRadius);
+            $.rectMode($.CORNER);
+            $.stroke(this._stroke);
+            $.strokeWeight(this._strokeWeight);
+            $.fill(this._fill);
+            $.rect(0, -w / 2, $.inverseScaleT5Coord(distance), w);
+            $.pop();
+        }
+
+        get pointA() {
+            const that = this;
+            return {
+                get x() {
+                    return $.inverseScaleT5Coord(that.constraint.bodyA.position.x);
+                },
+                set x(value) {
+                    Body.setPosition(that.constraint.bodyA, { x: $.scaleT5Coord(value), y: that.constraint.bodyA.position.y });
+                },
+                get y() {
+                    return $.inverseScaleT5Coord(that.constraint.bodyA.position.y);
+                },
+                set y(value) {
+                    Body.setPosition(that.constraint.bodyA, { x: that.constraint.bodyA.position.x, y: $.scaleT5Coord(value) });
+                }
+            };
+        }
+
+        get pointB() {
+            const that = this;
+            return {
+                get x() {
+                    return $.inverseScaleT5Coord(that.constraint.pointB.x);
+                },
+                set x(value) {
+                    that.constraint.pointB.x = $.scaleT5Coord(value);
+                },
+                get y() {
+                    return $.inverseScaleT5Coord(that.constraint.pointB.y);
+                },
+                set y(value) {
+                    that.constraint.pointB.y = $.scaleT5Coord(value);
+                }
+            };
+        }
+
+        set stroke(value) {
+            this._stroke = value.toString();
+        }
+
+        get stroke() {
+            return this._stroke;
+        }
+
+        set fill(value) {
+            this._fill = value.toString();
+        }
+
+        get fill() {
+            return this._fill;
+        }
+
+        set borderRadius(value) {
+            this._borderRadius = value;
+        }
+
+        get borderRadius() {
+            return this._borderRadius;
+        }
+
+        set strokeWeight(value) {
+            this._strokeWeight = $.scaleT5Coord(value);
+        }
+
+        get strokeWeight() {
+            return $.inverseScaleT5Coord(this._strokeWeight);
+        }
+
+        set width(value) {
+            this._width = $.scaleT5Coord(value);
+        }
+
+        get width() {
+            return $.inverseScaleT5Coord(this._width);
+        }
+
+        set length(value) {
+            this.constraint.length = $.scaleT5Coord(value);
+        }
+
+        get length() {
+            return $.inverseScaleT5Coord(this.constraint.length);
+        }
+
+        set stiffness(value) {
+            this.constraint.stiffness = value;
+        }
+
+        get stiffness() {
+            return this.constraint.stiffness;
+        }
+
+        set damping(value) {
+            this.constraint.damping = value;
+        }
+
+        get damping() {
+            return this.constraint.damping;
+        }
+    }
+
+
+    function createConstraint(bodyA, pointB, options = {}) {
+        [pointB.x, pointB.y] = $.scaleT5Coords([pointB.x, pointB.y]);
+
+        const scaledOptions = scaleOptions(options);
+        const constraint = Constraint.create({
+            bodyA: bodyA,
+            pointB: pointB,
+            ...scaledOptions
+        });
+
+        World.add(world, constraint);
+        const physicsConstraint = new PhysicsConstraint(constraint, options);
+
+        return new Proxy(physicsConstraint, {
+            get(target, prop) {
+                if (prop in target) {
+                    return target[prop];
+                } else if (prop in target.constraint) {
+                    return target.constraint[prop];
+                } else {
+                    return undefined;
+                }
+            },
+            set(target, prop, value) {
+                if (prop in target) {
+                    target[prop] = value;
+                } else if (prop in target.constraint) {
+                    target.constraint[prop] = value;
+                } else {
+                    return false;
+                }
+                return true;
+            }
+        });
     }
 
     $.PhysicsObject = PhysicsObject;
+    $.PhysicsGroup = PhysicsGroup;
+    $.Camera = Camera;
     $.physicsEllipse = physicsEllipse;
     $.physicsRect = physicsRect;
     $.physicsPolygon = physicsPolygon;
@@ -4206,9 +4614,10 @@ T5.addOns.physics = ($, p, globalScope) => {
     $.physicsBeginShape = physicsBeginShape;
     $.physicsVertex = physicsVertex;
     $.physicsEndShape = physicsEndShape;
+    $.createConstraint = createConstraint;
 
     $.worldGravity = function (g) {
-        engine.world.gravity.y = g;
+        engine.world.gravity.y = $.scaleT5Coord(g);
     };
 
     $.updatePhysics = function () {
@@ -4216,6 +4625,9 @@ T5.addOns.physics = ($, p, globalScope) => {
         for (let obj of $.physicsObjects) {
             obj.update();
             obj.display();
+        }
+        for (let constraint of $.physicsConstraints) {
+            constraint.display();
         }
         if ($._globalSketch) {
             window.physicsObjects = $.physicsObjects;
@@ -4226,6 +4638,8 @@ T5.addOns.physics = ($, p, globalScope) => {
 
     if ($._globalSketch) {
         globalScope.PhysicsObject = PhysicsObject;
+        globalScope.PhysicsGroup = PhysicsGroup;
+        globalScope.Camera = Camera;
         globalScope.physicsEllipse = physicsEllipse;
         globalScope.physicsRect = physicsRect;
         globalScope.physicsPolygon = physicsPolygon;
@@ -4233,6 +4647,7 @@ T5.addOns.physics = ($, p, globalScope) => {
         globalScope.physicsBeginShape = physicsBeginShape;
         globalScope.physicsVertex = physicsVertex;
         globalScope.physicsEndShape = physicsEndShape;
+        globalScope.createConstraint = createConstraint;
         globalScope.worldGravity = $.worldGravity;
         globalScope.updatePhysics = $.updatePhysics;
     }
