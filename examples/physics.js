@@ -1,9 +1,11 @@
 let mouseShape
 function setup() {
     createCanvas(window.innerWidth, window.innerWidth);
-    flexibleCanvas(800)//makes the project dimension agnostic
+    flexibleCanvas(800)// Makes the project dimension agnostic
 
-    // Make some random shapes
+    // Add some random shapes, 
+    // you dont want to add them in your draw loop
+
     for (let i = 0; i < 30; i++) {
         let shapes = random(['ellipse', 'rect', 'polygon'])
         if (shapes == 'ellipse') {
@@ -49,7 +51,7 @@ function setup() {
 
 function draw() {
     background('#14151f');
-    updatePhysics();
+    updatePhysics();//Update the physics every draw loop
 
     // Display the number of objects
     fill('#bababa');
