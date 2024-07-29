@@ -298,15 +298,14 @@ T5.addOns.physics = ($, p, globalScope) => {
             $.stroke(this.stroke);
             $.strokeWeight(this.strokeWeight);
             $.borderRadius(this.borderRadius);
-            if (this.rotationEnabled) {
-                $.rotate(this.angle);
-            }
             if (this.body.label === 'ellipse') {
+                $.rotate(this.angle);
                 $.ellipse(0, 0, $.inverseScaleT5Coord(this.body.circleRadius * 2));
                 if (this.debug) {
                     $.line(0, 0, 0, -$.inverseScaleT5Coord(this.body.circleRadius));
                 }
             } else if (this.body.label === 'rectangle') {
+                $.rotate(this.angle);
                 $.rectMode($.CENTER);
                 $.rect(0, 0, $.inverseScaleT5Coord(this.width), $.inverseScaleT5Coord(this.height));
                 if (this.debug) {
@@ -323,12 +322,11 @@ T5.addOns.physics = ($, p, globalScope) => {
                     const firstVertex = this.body.vertices[0];
                     $.line(0, 0, $.inverseScaleT5Coord(firstVertex.x - this.pos.x), $.inverseScaleT5Coord(firstVertex.y - this.pos.y));
                 }
+
             }
             $.pop();
         }
     }
-
-
 
     class PhysicsGroup {
         constructor() {
@@ -407,9 +405,6 @@ T5.addOns.physics = ($, p, globalScope) => {
         if (scaledOptions.mass !== undefined) {
             scaledOptions.mass = $.scaleT5Coord(scaledOptions.mass);
         }
-        if (scaledOptions.angle !== undefined) {
-            scaledOptions.angle = $.scaleT5Coord(scaledOptions.angle);
-        }
         if (scaledOptions.vertices !== undefined && Array.isArray(scaledOptions.vertices)) {
             scaledOptions.vertices = scaledOptions.vertices.map(vertex => {
                 return { x: $.scaleT5Coord(vertex.x), y: $.scaleT5Coord(vertex.y) };
@@ -417,7 +412,6 @@ T5.addOns.physics = ($, p, globalScope) => {
         }
         return scaledOptions;
     }
-
 
     function physicsEllipse(x, y, radius, options = {}) {
         [x, y, radius] = $.scaleT5Coords([x, y, radius]);
