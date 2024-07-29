@@ -287,12 +287,19 @@ T5.addOns.draw = ($, p) => {
 
     $.borderRadii = [];
 
-    $.borderRadius = function (...radii) {
-        if (radii == null || radii == undefined || radii == 'none') {
-            $.borderRadii = [];
+$.borderRadius = function (...radii) {
+    if (radii == null || radii == undefined || radii == 'none') {
+        $.borderRadii = [];
+    } else {
+        if (Array.isArray(radii[0])) {
+            // If the first argument is an array, use it directly
+            $.borderRadii = radii[0];
+        } else {
+            // Otherwise, use the arguments as an array
+            $.borderRadii = radii;
         }
-        $.borderRadii = radii;
-    };
+    }
+};
     $.noBorderRadius = function () {
         $.borderRadii = [];
     };
