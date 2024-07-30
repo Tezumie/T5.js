@@ -4026,6 +4026,7 @@ T5.addOns.physics = ($, p, globalScope) => {
     const world = engine.world;
 
     $.physicsObjects = [];
+
     class PhysicsObject {
         constructor(body, options = {}) {
             this.body = body;
@@ -4236,8 +4237,8 @@ T5.addOns.physics = ($, p, globalScope) => {
             this.pos = this.body.position;
             this.x = $.inverseScaleT5Coord(this.pos.x);
             this.y = $.inverseScaleT5Coord(this.pos.y);
-            if (this.rotationEnabled) {
-                this.angle = this.body.angle;
+            if (!this.rotationEnabled) {
+                Body.setAngle(this.body, 0); // Prevent rotation by setting angle to 0
             }
             this._applySpeedLimits();
         }
