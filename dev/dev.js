@@ -1,116 +1,49 @@
-let balls;
-let constraints;
-let numBalls = 5;
-let ballRadius = 30;
-let stringLength = 250;
-let draggingBall = null;
+let aspectRatio = 5 / 1;
 
 function setup() {
-    createCanvas(window.innerWidth, window.innerWidth);
-    flexibleCanvas(800);
-    worldGravity(2.0);
-    balls = new PhysicsGroup(); // create groups to manage physics objects
-    constraints = new PhysicsGroup();
-    let startX = width / 2 - ((numBalls - 1) * ballRadius);
-    frameRate(60);
-
-    for (let i = 0; i < numBalls; i++) {
-        let x = startX + i * (ballRadius * 2);
-        let y = height / 1.5;
-
-        let ball = physicsEllipse(x, y, ballRadius * 2);
-        ball.restitution = 1.15; // Ball bounciness
-        ball.fill = color('#14151f69'); // Use color function
-        ball.stroke = '#bababa';
-        ball.width = 5;
-        ball.hit = 0; // create custom property for a timer
-        balls.add(ball);
-
-        let anchor = { x: x, y: y - stringLength };
-        let constraint = createConstraint(ball.body, anchor, { length: stringLength, stiffness: 0.2, damping: 0.2 });
-        constraints.add(constraint);
-    }
-
-    // Pull the first ball to the left
-    balls[0].setPosition(balls[0].x - 150, balls[0].y - 50);
+    createCanvas(window.innerWidth, window.innerWidth / aspectRatio);
+    flexibleCanvas(1000);
 }
 
 function draw() {
-    background('#14151f');
+    background(220);
+    rectMode(CENTER)
 
-    for (let i = 0; i < balls.length; i++) {
-        let ball = balls[i];
-        let constraint = constraints[i];
+    fill(0, 119, 255)
+    borderRadius(20)
+    innerBorderRadius(20)
+    hollowPolygon(100, 100, 100, 5, 50)
 
-        // Adjust constraint stiffness and damping based on distance (springy rope)
-        let distance = dist(ball.x, ball.y, constraint.pointB.x, constraint.pointB.y);
-        if (distance > stringLength) {
-            constraint.stiffness = 0.2;
-            constraint.length = stringLength;
-            constraint.damping = 0.2; // Increase damping to reduce oscillations
-        } else {
-            constraint.stiffness = 0.000001;
-            constraint.damping = 0.000005; // Decrease damping to allow more oscillations
-        }
+    fill(255, 0, 0)
+    borderRadius(30, 0, 30, 0)
+    innerBorderRadius(20, 0, 20, 0)
+    hollowRect(300, 100, 120, 120, 30)
 
-        // Calculate stroke color based on distance
-        let maxDistance = stringLength * 1.5;
-        let minDistance = 50;
-        let colorFactor = map(distance, minDistance, maxDistance, 0, 1.5);
-        let strokeColor = lerpColor(color(0, 255, 255), color(255, 200, 0), colorFactor);
-        let fillColor = lerpColor(color(0, 255, 255, 50), color(255, 200, 0, 100), colorFactor);
+    fill(255, 230, 0)
+    borderRadius(30)
+    innerBorderRadius(10)
+    hollowStar(500, 100, 100, 50, 5, 50, 30)
 
-        constraint.fill = '#14151f';
-        constraint.stroke = strokeColor;
-        constraint.width = 6;
-        constraint.borderRadius = [0, 3, 3, 0];
+    fill(30, 255, 0)
+    borderRadius(0)
+    innerBorderRadius(0)
+    hollowEllipse(700, 100, 150, 150, 50)
 
-        // Update ball color based on hit timer
-        if (ball.hit > 0) {
-            ball.hit--;
-            ball.fill = lerpColor(fillColor, color(255, 0, 0, 100), ball.hit / frameRate()); // Adjust 60 to change duration
-        } else {
-            ball.fill = fillColor;
-        }
+    fill(255, 93, 161)
+    borderRadius(20, 0, 10, 0, 30)
+    innerBorderRadius(5)
+    beginShape()
+    vertex(800, 100)
+    vertex(900, 20)
+    vertex(950, 100)
+    vertex(950, 150)
+    vertex(850, 170)
 
-        ball.stroke = strokeColor;
-    }
+    innerVertex(850, 100)
+    innerVertex(900, 70)
+    innerVertex(930, 130)
+    innerVertex(860, 150)
+    innerVertex(880, 130)
+    endShape(CLOSE)
 
-    // Check collisions and update hit timer
-    for (let i = 0; i < balls.length; i++) {
-        for (let j = i + 1; j < balls.length; j++) {
-            if (balls[i].collidesWith(balls[j])) {
-                balls[i].hit = frameRate(); // Set hit timer to 60 frames
-                balls[j].hit = frameRate(); // Set hit timer to 60 frames
-            }
-        }
-    }
-
-    fill(170, 170, 170, 10);
-    stroke(255, 50);
-    ellipse(mouseX, mouseY, 60);
-
-    // Update physics world
-    updatePhysics();
-}
-
-function mousePressed() {
-    for (let i = 0; i < balls.length; i++) {
-        let ball = balls[i];
-        let d = dist(mouseX, mouseY, ball.x, ball.y);
-        if (d < ballRadius) {
-            draggingBall = ball;
-            break;
-        }
-    }
-}
-
-function mouseDragged() {
-    if (draggingBall) {
-        draggingBall.moveTo(mouseX, mouseY);
-    }
-}
-
-function mouseReleased() {
-    draggingBall = null;
 }
