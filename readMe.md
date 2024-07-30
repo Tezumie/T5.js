@@ -82,7 +82,10 @@ T5.js handles some functionalities different than p5, but almost all p5 drawing 
 
 There are also some T5.js specific functions such as `borderRadius()`, `noiseEllipse()`,  `gradientFill()`, `polygon()` and more! look in the examples folder to see how some of them work.
 
+For more details, see the [documentation](examples/customFunctions.md).
+
 ![gradient functions](images/customGradients.png)![custom shapes](images/customShapes.png)
+
 ### Instances
 
 In t5js, an instance contains all the properties and methods for a t5 sketch. Each instance has an optional `preload()`, `setup()` and `draw()` function, similar to a regular global sketch.
