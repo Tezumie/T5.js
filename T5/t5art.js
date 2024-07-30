@@ -51,7 +51,6 @@ T5.addOns.art = ($, p) => {
         $.context.restore();
     };
 
-
     $.noiseLine = function (x1, y1, x2, y2, noiseScale = 0.05, noiseStrength = 35) {
         const distance = $.dist(x1, y1, x2, y2);
         const steps = Math.ceil(distance / 5);
@@ -157,15 +156,131 @@ T5.addOns.art = ($, p) => {
         }
         $.endShape(true);
     };
+
+    $.hollowRect = function (x, y, w, h = w, innerPadding = 20) {
+        if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            switch ($.currentRectMode) {
+                case 'corner':
+                    break;
+                case 'corners':
+                    w = w - x;
+                    h = h - y;
+                    break;
+                case 'center':
+                    x = x - w / 2;
+                    y = y - h / 2;
+                    break;
+                case 'radius':
+                    x = x - w;
+                    y = y - h;
+                    w = 2 * w;
+                    h = 2 * h;
+                    break;
+            }
+            let innerX = x + innerPadding;
+            let innerY = y + innerPadding;
+            let innerW = w - 2 * innerPadding;
+            let innerH = h - 2 * innerPadding;
+            $.beginShape();
+            $.vertex(x, y);
+            $.vertex(x + w, y);
+            $.vertex(x + w, y + h);
+            $.vertex(x, y + h);
+            $.innerVertex(innerX, innerY);
+            $.innerVertex(innerX + innerW, innerY);
+            $.innerVertex(innerX + innerW, innerY + innerH);
+            $.innerVertex(innerX, innerY + innerH);
+            $.endShape(CLOSE);
+
+        }
+    };
+
+    $.hollowPolygon = function (x, y, radius, verts, innerRadius) {
+        if ($.context) {
+            const angleOffset = -Math.PI / 2;
+            const angleIncrement = (2 * Math.PI) / verts;
+
+            $.beginShape();
+            for (let i = 0; i < verts; i++) {
+                const angle = i * angleIncrement + angleOffset;
+                const vx = x + Math.cos(angle) * radius;
+                const vy = y + Math.sin(angle) * radius;
+                $.vertex(vx, vy);
+            }
+            for (let i = 0; i < verts; i++) {
+                const angle = i * angleIncrement + angleOffset;
+                const ivx = x + Math.cos(angle) * innerRadius;
+                const ivy = y + Math.sin(angle) * innerRadius;
+                $.innerVertex(ivx, ivy);
+            }
+            $.endShape(CLOSE);
+        }
+    };
+
+    $.hollowStar = function (x, y, radius1, radius2, points, innerRadius1, innerRadius2) {
+        if ($.context) {
+            const angleOffset = -Math.PI / 2;
+            const angleIncrement = (2 * Math.PI) / points;
+
+            $.beginShape();
+            for (let i = 0; i < points * 2; i++) {
+                const angle = i * angleIncrement / 2 + angleOffset;
+                const radius = (i % 2 === 0) ? radius1 : radius2;
+                const vx = x + Math.cos(angle) * radius;
+                const vy = y + Math.sin(angle) * radius;
+                $.vertex(vx, vy);
+            }
+            for (let i = 0; i < points * 2; i++) {
+                const angle = i * angleIncrement / 2 + angleOffset;
+                const innerRadius = (i % 2 === 0) ? innerRadius1 : innerRadius2;
+                const ivx = x + Math.cos(angle) * innerRadius;
+                const ivy = y + Math.sin(angle) * innerRadius;
+                $.innerVertex(ivx, ivy);
+            }
+            $.endShape(CLOSE);
+        }
+    };
+
+    $.hollowEllipse = function (x, y, w, h = w, innerPadding = 20) {
+        if ($.context) {
+            if ($.noAlphaFill && $.noAlphaStroke) {
+                return;
+            }
+
+            let innerW = w - 2 * innerPadding;
+            let innerH = h - 2 * innerPadding;
+
+            $.beginShape();
+            // Outer ellipse
+            for (let angle = 0; angle < TWO_PI; angle += 0.1) {
+                let outerX = x + cos(angle) * w / 2;
+                let outerY = y + sin(angle) * h / 2;
+                $.vertex(outerX, outerY);
+            }
+
+            // Inner ellipse
+            for (let angle = 0; angle < TWO_PI; angle += 0.1) {
+                let innerX = x + cos(angle) * innerW / 2;
+                let innerY = y + sin(angle) * innerH / 2;
+                $.innerVertex(innerX, innerY);
+            }
+            $.endShape(CLOSE);
+        }
+    };
+
     $.fillArea = (x, y, ...colorArgs) => {
         const ctx = $.context, canvas = $.canvas;
         [x, y] = $.scaleT5Coords([x, y]);
         [x, y] = [Math.floor(x), Math.floor(y)];
 
-    if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
-        console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
-        return;
-    }
+        if (x < 0 || x >= canvas.width || y < 0 || y >= canvas.height) {
+            console.warn(`fillArea: Coordinates (${x}, ${y}) are out of canvas bounds (width: ${canvas.width}, height: ${canvas.height}).`);
+            return;
+        }
 
         const fillColor = handleColorArgument(colorArgs);
         if (!fillColor) {
