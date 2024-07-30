@@ -264,15 +264,27 @@ T5.addOns.draw = ($, p) => {
 
     let currentShapeVertices = [];
     let currentShapeMode = '';
+    let innerShapeVertices = [];
+    $.innerBorderRadii = [];
 
     $.beginShape = function (mode = 'LINES') {
         currentShapeVertices = [];
+        innerShapeVertices = [];
         currentShapeMode = mode;
+    };
+
+    $.beginContour = function () {
+        console.warn('beginContour() is depreciated, use innerVertex(x, y) instead.')
     };
 
     $.vertex = function (x, y) {
         [x, y] = $.scaleT5Coords([x, y]);
         currentShapeVertices.push({ x, y, type: 'vertex' });
+    };
+
+    $.innerVertex = function (x, y) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        innerShapeVertices.push({ x, y, type: 'vertex' });
     };
 
     $.bezierVertex = function (cp1x, cp1y, cp2x, cp2y, x, y) {
@@ -287,21 +299,33 @@ T5.addOns.draw = ($, p) => {
 
     $.borderRadii = [];
 
-$.borderRadius = function (...radii) {
-    if (radii == null || radii == undefined || radii == 'none') {
-        $.borderRadii = [];
-    } else {
-        if (Array.isArray(radii[0])) {
-            // If the first argument is an array, use it directly
-            $.borderRadii = radii[0];
+    $.borderRadius = function (...radii) {
+        if (radii == null || radii == undefined || radii == 'none') {
+            $.borderRadii = [];
         } else {
-            // Otherwise, use the arguments as an array
-            $.borderRadii = radii;
+            if (Array.isArray(radii[0])) {
+                $.borderRadii = radii[0];
+            } else {
+                $.borderRadii = radii;
+            }
         }
-    }
-};
+    };
+
+    $.innerBorderRadius = function (...radii) {
+        if (radii == null || radii == undefined || radii == 'none') {
+            $.innerBorderRadii = [];
+        } else {
+            if (Array.isArray(radii[0])) {
+                $.innerBorderRadii = radii[0];
+            } else {
+                $.innerBorderRadii = radii;
+            }
+        }
+    };
+
     $.noBorderRadius = function () {
         $.borderRadii = [];
+        $.innerBorderRadii = [];
     };
 
     $.endShape = function (CLOSE) {
@@ -313,108 +337,117 @@ $.borderRadius = function (...radii) {
             $.context.beginPath();
 
             if ($.borderRadii.length > 0) {
-                _drawPathWithBorderRadius($.context, currentShapeVertices, CLOSE);
+                _drawPathWithBorderRadius($.context, currentShapeVertices, $.borderRadii, CLOSE);
             } else {
-                // Check if the shape starts with a curve vertex
-                if (currentShapeVertices[0].type === 'curve') {
-                    let vertices = [...currentShapeVertices];
+                drawVertices($.context, currentShapeVertices, CLOSE);
+            }
 
-                    // Add phantom points at the beginning and end
-                    vertices.unshift(vertices[0]);
-                    vertices.push(vertices[vertices.length - 1]);
-
-                    // Move to the first actual point
-                    $.context.moveTo(vertices[1].x, vertices[1].y);
-
-                    for (let i = 1; i < vertices.length - 2; i++) {
-                        let p0 = vertices[i - 1];
-                        let p1 = vertices[i];
-                        let p2 = vertices[i + 1];
-                        let p3 = vertices[i + 2];
-
-                        for (let t = 0; t <= 1; t += 0.1) {
-                            let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
-                                (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
-                                (-p0.x + p2.x) * t +
-                                2 * p1.x);
-
-                            let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
-                                (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
-                                (-p0.y + p2.y) * t +
-                                2 * p1.y);
-
-                            $.context.lineTo(x, y);
-                        }
-                    }
-                    // Line to the last actual point
-                    $.context.lineTo(vertices[vertices.length - 2].x, vertices[vertices.length - 2].y);
-
+            if (innerShapeVertices.length > 0) {
+                $.context.moveTo(innerShapeVertices[0].x, innerShapeVertices[0].y);
+                if ($.innerBorderRadii.length > 0) {
+                    _drawPathWithBorderRadius($.context, innerShapeVertices, $.innerBorderRadii, CLOSE);
                 } else {
-                    // Start at the first vertex if not a curve
-                    let startVertex = currentShapeVertices[0];
-                    $.context.moveTo(startVertex.x, startVertex.y);
-
-                    for (let i = 1; i < currentShapeVertices.length; i++) {
-                        let currentVertex = currentShapeVertices[i];
-                        if (currentVertex.type === 'vertex') {
-                            $.context.lineTo(currentVertex.x, currentVertex.y);
-                        } else if (currentVertex.type === 'bezier') {
-                            $.context.bezierCurveTo(
-                                currentVertex.cp1x,
-                                currentVertex.cp1y,
-                                currentVertex.cp2x,
-                                currentVertex.cp2y,
-                                currentVertex.x,
-                                currentVertex.y
-                            );
-                        } else if (currentVertex.type === 'curve') {
-                            // Add phantom points at the beginning and end for curve calculations
-                            let p0 = currentShapeVertices[i - 1];
-                            let p1 = currentVertex;
-                            let p2 = currentShapeVertices[i + 1] || currentVertex;
-                            let p3 = currentShapeVertices[i + 2] || p2;
-
-                            for (let t = 0; t <= 1; t += 0.1) {
-                                let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
-                                    (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
-                                    (-p0.x + p2.x) * t +
-                                    2 * p1.x);
-
-                                let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
-                                    (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
-                                    (-p0.y + p2.y) * t +
-                                    2 * p1.y);
-
-                                $.context.lineTo(x, y);
-                            }
-                        }
-                    }
-                }
-
-                if (CLOSE) {
-                    $.context.closePath();
+                    drawVertices($.context, innerShapeVertices, CLOSE);
                 }
             }
 
             if (!$.noAlphaFill) {
-                $.context.fill();
+                $.context.fill('evenodd');
             }
             if (!$.noAlphaStroke) {
                 $.context.stroke();
             }
+
             currentShapeVertices = [];
+            innerShapeVertices = [];
             currentShapeMode = '';
         }
     };
 
-    function _drawPathWithBorderRadius(ctx, vertices, close) {
+    function drawVertices(ctx, vertices, close) {
+        if (vertices.length === 0) return;
+
+        if (vertices[0].type === 'curve') {
+            let verts = [...vertices];
+            verts.unshift(verts[0]);
+            verts.push(verts[verts.length - 1]);
+            ctx.moveTo(verts[1].x, verts[1].y);
+
+            for (let i = 1; i < verts.length - 2; i++) {
+                let p0 = verts[i - 1];
+                let p1 = verts[i];
+                let p2 = verts[i + 1];
+                let p3 = verts[i + 2];
+
+                for (let t = 0; t <= 1; t += 0.1) {
+                    let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
+                        (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
+                        (-p0.x + p2.x) * t +
+                        2 * p1.x);
+
+                    let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
+                        (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
+                        (-p0.y + p2.y) * t +
+                        2 * p1.y);
+
+                    ctx.lineTo(x, y);
+                }
+            }
+            ctx.lineTo(verts[verts.length - 2].x, verts[verts.length - 2].y);
+
+        } else {
+            let startVertex = vertices[0];
+            ctx.moveTo(startVertex.x, startVertex.y);
+
+            for (let i = 1; i < vertices.length; i++) {
+                let currentVertex = vertices[i];
+                if (currentVertex.type === 'vertex') {
+                    ctx.lineTo(currentVertex.x, currentVertex.y);
+                } else if (currentVertex.type === 'bezier') {
+                    ctx.bezierCurveTo(
+                        currentVertex.cp1x,
+                        currentVertex.cp1y,
+                        currentVertex.cp2x,
+                        currentVertex.cp2y,
+                        currentVertex.x,
+                        currentVertex.y
+                    );
+                } else if (currentVertex.type === 'curve') {
+                    let p0 = vertices[i - 1];
+                    let p1 = currentVertex;
+                    let p2 = vertices[i + 1] || currentVertex;
+                    let p3 = vertices[i + 2] || p2;
+
+                    for (let t = 0; t <= 1; t += 0.1) {
+                        let x = 0.5 * ((-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t * t * t +
+                            (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t * t +
+                            (-p0.x + p2.x) * t +
+                            2 * p1.x);
+
+                        let y = 0.5 * ((-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t * t * t +
+                            (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t * t +
+                            (-p0.y + p2.y) * t +
+                            2 * p1.y);
+
+                        ctx.lineTo(x, y);
+                    }
+                }
+            }
+
+            if (close) {
+                ctx.closePath();
+            }
+        }
+    }
+
+    function _drawPathWithBorderRadius(ctx, vertices, radii, close) {
         if (vertices.length < 2) return;
 
         const firstVertex = vertices[0];
         const lastVertex = vertices[vertices.length - 1];
 
-        if (close && $.borderRadii.length > 0) {
-            const radius = _getBorderRadius(0);
+        if (close && radii.length > 0) {
+            const radius = _getBorderRadius(radii, 0);
             const prevLine = _calculateLine(lastVertex, firstVertex, radius);
             ctx.moveTo(prevLine.x1, prevLine.y1);
         } else {
@@ -426,7 +459,7 @@ $.borderRadius = function (...radii) {
             const nextVertex = vertices[(i + 1) % len];
             const prevVertex = vertices[(i - 1 + len) % len];
 
-            const radius = _getBorderRadius(i);
+            const radius = _getBorderRadius(radii, i);
             if (radius > 0) {
                 const prevLine = _calculateLine(prevVertex, currVertex, radius);
                 const nextLine = _calculateLine(currVertex, nextVertex, radius);
@@ -461,9 +494,9 @@ $.borderRadius = function (...radii) {
         };
     }
 
-    function _getBorderRadius(index) {
-        if ($.borderRadii.length === 0) return 0;
-        let radius = $.borderRadii[Math.min(index, $.borderRadii.length - 1)];
+    function _getBorderRadius(radii, index) {
+        if (radii.length === 0) return 0;
+        let radius = radii[Math.min(index, radii.length - 1)];
         [radius] = $.scaleT5Coords([radius]);
         return radius;
     }
