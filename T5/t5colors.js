@@ -107,17 +107,93 @@ T5.addOns.colors = ($, p) => {
         return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
     }
 
+    function hsbToRgb(h, s, b) {
+        h = h / 360;
+        const i = Math.floor(h * 6);
+        const f = h * 6 - i;
+        const p = b * (1 - s);
+        const q = b * (1 - f * s);
+        const t = b * (1 - (1 - f) * s);
+        let r, g, blue;
+        switch (i % 6) {
+            case 0: r = b; g = t; blue = p; break;
+            case 1: r = q; g = b; blue = p; break;
+            case 2: r = p; g = b; blue = t; break;
+            case 3: r = p; g = q; blue = b; break;
+            case 4: r = t; g = p; blue = b; break;
+            case 5: r = b; g = p; blue = q; break;
+        }
+        return [r * 255, g * 255, blue * 255];
+    }
+
+    // Initial color mode and ranges
+    let colorMode = 'RGB';
+    let maxR = 255, maxG = 255, maxB = 255, maxA = 255;
+
+    $.defineConstant('RGB', 'RGB');
+    $.defineConstant('HSB', 'HSB');
+    $.defineConstant('HSL', 'HSL');
+
+    $.colorMode = function (mode, max1 = 255, max2 = 255, max3 = 255, maxA_ = 255) {
+        colorMode = mode;
+        maxR = max1;
+        maxG = max2;
+        maxB = max3;
+        maxA = maxA_;
+    };
+
     $.color = function (...args) {
         if (args.length === 1 && typeof args[0] === 'string') {
             return parseColorString(args[0]);
-        } else if (args.length === 1 && typeof args[0] === 'number') {
-            return new ColorRGBA(args[0], args[0], args[0]);
-        } else if (args.length === 1 && Array.isArray(args[0])) {
-            return new ColorRGBA(...args[0]);
-        } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
-            return new ColorRGBA(args[0], args[0], args[0], args[1]);
-        } else if (args.length >= 3) {
-            return new ColorRGBA(args[0], args[1], args[2], args[3]);
+        }
+
+        if (colorMode === 'RGB') {
+            if (args.length === 1 && typeof args[0] === 'number') {
+                const c = (args[0] / maxR) * 255;
+                return new ColorRGBA(c, c, c);
+            } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
+                const c = (args[0] / maxR) * 255;
+                const a = (args[1] / maxA) * 255;
+                return new ColorRGBA(c, c, c, a);
+            } else if (args.length >= 3) {
+                const r = (args[0] / maxR) * 255;
+                const g = (args[1] / maxG) * 255;
+                const b = (args[2] / maxB) * 255;
+                const a = args[3] !== undefined ? (args[3] / maxA) * 255 : 255;
+                return new ColorRGBA(r, g, b, a);
+            }
+        } else if (colorMode === 'HSB') {
+            if (args.length === 1 && typeof args[0] === 'number') {
+                const b = (args[0] / maxB) * 255;
+                return new ColorRGBA(b, b, b);
+            } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
+                const b = (args[0] / maxB) * 255;
+                const a = (args[1] / maxA) * 255;
+                return new ColorRGBA(b, b, b, a);
+            } else if (args.length >= 3) {
+                const h = (args[0] / maxR) * 360;
+                const s = (args[1] / maxG);
+                const b = (args[2] / maxB);
+                const a = args[3] !== undefined ? (args[3] / maxA) * 255 : 255;
+                const [r, g, blue] = hsbToRgb(h, s, b);
+                return new ColorRGBA(r, g, blue, a);
+            }
+        } else if (colorMode === 'HSL') {
+            if (args.length === 1 && typeof args[0] === 'number') {
+                const l = (args[0] / maxB) * 255;
+                return new ColorRGBA(l, l, l);
+            } else if (args.length === 2 && typeof args[0] === 'number' && typeof args[1] === 'number') {
+                const l = (args[0] / maxB) * 255;
+                const a = (args[1] / maxA) * 255;
+                return new ColorRGBA(l, l, l, a);
+            } else if (args.length >= 3) {
+                const h = (args[0] / maxR);
+                const s = (args[1] / maxG);
+                const l = (args[2] / maxB);
+                const a = args[3] !== undefined ? (args[3] / maxA) * 255 : 255;
+                const [r, g, blue] = hslToRgb(h, s, l);
+                return new ColorRGBA(r, g, blue, a);
+            }
         }
         return null;
     };
@@ -132,6 +208,8 @@ T5.addOns.colors = ($, p) => {
             colorObj = args[0];
         } else if (args.length === 1 && Array.isArray(args[0])) {
             colorObj = $.color(...args[0]);
+        } else if (args.length === 1 && typeof args[0] === 'number') {
+            colorObj = $.color(args[0]);
         } else {
             colorObj = $.color(...args);
         }
