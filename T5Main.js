@@ -1186,8 +1186,8 @@ T5.addOns.image = ($, p) => {
     }
 
     $.image = function (img, x, y, w, h) {
+        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
         if (!img) return;
-
         let source;
         if (img instanceof T5Image) {
             source = img.img;
@@ -1196,18 +1196,16 @@ T5.addOns.image = ($, p) => {
         } else if (img instanceof Image) {
             source = img;
         } else if (img.img) {
-            source = img.img;
+            source = img.img
         } else {
             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
-
-        let offset = $.scaleT5Coord(0.0);
-        w = w ? $.scaleT5Coord(w) : $.scaleT5Coord(source.width) + offset;
-        h = h ? $.scaleT5Coord(h) : $.scaleT5Coord(source.height) + offset;
-
+        let offset = $.scaleT5Coord(0.0)
+        let width = w + offset || $.scaleT5Coord(source.width) + offset;
+        let height = h + offset || $.scaleT5Coord(source.height) + offset;
         switch ($.currentImageMode) {
             case 'corner':
-                break; // Default behavior
+                break;
             case 'corners':
                 w = w - x;
                 h = h - y;
@@ -1217,37 +1215,29 @@ T5.addOns.image = ($, p) => {
                 y = y - h / 2;
                 break;
         }
-
-        [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
-
         if ($.currentTint) {
-            const tempCanvas = createTempCanvas(w, h);
+            const tempCanvas = createTempCanvas(width, height);
 
-            // Draw the image to the temporary canvas
-            tempCanvas.clearRect(0, 0, w, h);
-            tempCanvas.drawImage(source, 0, 0, w, h);
+            tempCanvas.clearRect(0, 0, width, height);
+            tempCanvas.drawImage(source, 0, 0, width, height);
 
-            // Extract RGB and Alpha values from the current tint
             const tintRGB = extractRGBFromColorString($.currentTint);
             const tintAlpha = extractAlphaFromColorString($.currentTint);
 
-            // Apply the tint color using the 'multiply' blend mode
             tempCanvas.globalCompositeOperation = 'multiply';
             tempCanvas.fillStyle = tintRGB;
-            tempCanvas.fillRect(0, 0, w, h);
+            tempCanvas.fillRect(0, 0, width, height);
 
-            // Draw the tinted image back to the main canvas with the correct alpha
             $.context.save();
             $.context.globalAlpha = tintAlpha;
-            $.context.drawImage(tempCanvas.canvas, x, y, w, h);
+            $.context.drawImage(tmpCanvas, x, y, width, height);
             $.context.globalAlpha = 1; // Reset alpha to default
             $.context.restore();
         } else {
-            $.context.drawImage(source, x, y, w, h);
+            $.context.drawImage(source, x, y, width, height);
         }
         return img;
     };
-
 
 };
 
