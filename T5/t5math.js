@@ -135,7 +135,6 @@ T5.addOns.math = ($, p) => {
         }
     }
 
-    // Perlin Noise
     class PerlinNoise extends Noise {
         constructor(seed) {
             super();
@@ -158,20 +157,17 @@ T5.addOns.math = ($, p) => {
                 p[i] = i;
             }
 
-            let n, q;
             for (let i = 255; i > 0; i--) {
                 seed = (seed * 16807) % 2147483647;
-                n = seed % (i + 1);
-                q = p[i];
-                p[i] = p[n];
-                p[n] = q;
+                const n = seed % (i + 1);
+                [p[i], p[n]] = [p[n], p[i]];
             }
 
             return p;
         }
 
         dot(g, x, y, z) {
-            return g[0] * x + g[1] * y + g[2] * z;
+            return g ? (g[0] * x + g[1] * y + g[2] * z) : 0;
         }
 
         fade(t) {
@@ -235,7 +231,6 @@ T5.addOns.math = ($, p) => {
             return (1 - t) * a + t * b;
         }
     }
-
     // Simplex Noise
     class SimplexNoise extends Noise {
         constructor(seed) {
@@ -436,12 +431,23 @@ T5.addOns.math = ($, p) => {
         return noiseGenerator.noise(x, y, z);
     };
 
-    // // Angle Conversion
     $.toRadians = (angle) => $.angleMode === DEGREES ? angle * (Math.PI / 180) : angle;
     $.toDegrees = (angle) => $.angleMode === RADIANS ? angle * (180 / Math.PI) : angle;
     $.noiseSeed(noiseSeedValue);
     $.randomSeed(randomSeedValue);
     initNoiseGenerator();
+
+    $.shuffle = function (array, modify = false) {
+        let arr = modify ? array : array.slice();
+        let m = arr.length, t, i;
+        while (m) {
+            i = Math.floor(Math.random() * m--);
+            t = arr[m];
+            arr[m] = arr[i];
+            arr[i] = t;
+        }
+        return arr;
+    };
 };
 
 T5.addOns.math(T5.prototype, T5.prototype);
