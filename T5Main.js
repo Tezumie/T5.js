@@ -37,9 +37,6 @@ function T5(scope = 'global', parent) {
     $._isLooping = true;
     $._shouldDrawOnce = false;
 
-    let millisStart = performance.now();
-    $.millis = () => performance.now() - millisStart;
-
     $.frameRate = (rate) => {
         if (rate !== undefined) {
             $._setFrameRate = rate;
@@ -53,16 +50,13 @@ function T5(scope = 'global', parent) {
         $.resetMatrix();
         let now = performance.now();
         $._previousFrame ??= now - $._frameLength;
-
         if ($._isLooping || $._shouldDrawOnce) {
             requestAnimationFrame(_draw);
         } else if ($.frameCount && !$._redraw) {
             return;
         }
-
         let timeSinceLast = now - $._previousFrame;
         if (timeSinceLast < $._frameLength - 1) return;
-
         $.deltaTime = now - $._previousFrame;
         $._frameRate = 1000 / $.deltaTime;
         $.frameCount++;
@@ -84,9 +78,7 @@ function T5(scope = 'global', parent) {
                 filter: $.context.filter,
                 imageSmoothingEnabled: $.context.imageSmoothingEnabled
             };
-
             $.context.restore();
-
             $.context.fillStyle = prevProps.fillStyle;
             $.context.strokeStyle = prevProps.strokeStyle;
             $.context.lineWidth = prevProps.lineWidth;
@@ -99,8 +91,7 @@ function T5(scope = 'global', parent) {
             $.context.filter = prevProps.filter;
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
-
-        $._previousFrame = now;
+        $._previousFrame = performance.now();
         $._shouldDrawOnce = false;
     }
 
@@ -121,7 +112,7 @@ function T5(scope = 'global', parent) {
         }
         // Check if preload function exists and if there are items to preload
         if (typeof $.preload !== 'function' || window.t5PreloadCount === window.t5PreloadDone) {
-            millisStart = performance.now();
+
             if (typeof $.setup === 'function') $.setup();
 
             if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
@@ -136,7 +127,7 @@ function T5(scope = 'global', parent) {
             const checkPreloadDone = setInterval(() => {
                 if (window.t5PreloadCount === window.t5PreloadDone) {
                     clearInterval(checkPreloadDone);
-                    millisStart = performance.now();
+
                     if (typeof $.setup === 'function') $.setup();
 
                     if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
