@@ -57,6 +57,7 @@ function T5(scope = 'global', parent) {
         }
         let timeSinceLast = now - $._previousFrame;
         if (timeSinceLast < $._frameLength - 1) return;
+
         $.deltaTime = now - $._previousFrame;
         $._frameRate = 1000 / $.deltaTime;
         $.frameCount++;
@@ -78,7 +79,9 @@ function T5(scope = 'global', parent) {
                 filter: $.context.filter,
                 imageSmoothingEnabled: $.context.imageSmoothingEnabled
             };
+
             $.context.restore();
+
             $.context.fillStyle = prevProps.fillStyle;
             $.context.strokeStyle = prevProps.strokeStyle;
             $.context.lineWidth = prevProps.lineWidth;
@@ -91,7 +94,8 @@ function T5(scope = 'global', parent) {
             $.context.filter = prevProps.filter;
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
-        $._previousFrame = performance.now();
+
+        $._previousFrame = now;
         $._shouldDrawOnce = false;
     }
 
