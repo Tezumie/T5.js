@@ -291,24 +291,23 @@ T5.addOns.colors = ($, p) => {
         $.currentTint = null;
     };
 
-    // Extract color components
     $.red = function (col) {
-        const colorObj = $.color(col);
+        const colorObj = $.isColorObject(col) ? col : $.color(col);
         return colorObj.r;
     };
 
     $.green = function (col) {
-        const colorObj = $.color(col);
+        const colorObj = $.isColorObject(col) ? col : $.color(col);
         return colorObj.g;
     };
 
     $.blue = function (col) {
-        const colorObj = $.color(col);
+        const colorObj = $.isColorObject(col) ? col : $.color(col);
         return colorObj.b;
     };
 
     $.alpha = function (col) {
-        const colorObj = $.color(col);
+        const colorObj = $.isColorObject(col) ? col : $.color(col);
         return colorObj.a;
     };
 
