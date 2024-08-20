@@ -448,6 +448,11 @@ T5.addOns.math = ($, p) => {
         }
         return arr;
     };
+
+    $.print = function (...args) {
+        console.log(...args);
+    };
+
 };
 
 T5.addOns.math(T5.prototype, T5.prototype);
