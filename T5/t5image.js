@@ -5,28 +5,42 @@ T5.addOns.image = ($, p) => {
     class T5Image {
         constructor(img) {
             this.img = img;
-            this.width = img.width;
-            this.height = img.height;
+            this.width = 0; // Initialize width as 0
+            this.height = 0; // Initialize height as 0
+        }
+
+        // Method to update dimensions after load
+        setDimensions(width, height) {
+            this.width = width;
+            this.height = height;
         }
     }
+
 
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
         const img = new Image();
-        const t5Img = new T5Image(img);
         img.crossOrigin = 'Anonymous';
+
         img.onload = () => {
             window.t5PreloadDone++;
+
+            // Create the T5Image instance after the image has fully loaded
+            const t5Img = new T5Image(img);
+            t5Img.setDimensions(img.width, img.height); // Set dimensions here
+
             if (callback) {
-                callback(t5Img);
+                callback(t5Img); // Call the callback with the fully loaded image
             }
         };
+
         img.onerror = (err) => {
             window.t5PreloadDone++;
             console.error(`Failed to load image at path: ${path}. Please check your image path.`);
         };
-        img.src = path;
-        return t5Img;
+
+        img.src = path; // Set the source to start loading the image
+        return img;
     };
 
     let tmpCanvas = null;
@@ -52,7 +66,7 @@ T5.addOns.image = ($, p) => {
         return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
     }
 
-    $.image = function (img, x, y, w, h) {
+    $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
         let source;
         if (img instanceof T5Image) {
@@ -70,6 +84,9 @@ T5.addOns.image = ($, p) => {
 
         w = w ? (w) : (source.width) + offset;
         h = h ? (h) : (source.height) + offset;
+
+        sw = sw !== undefined ? sw : source.width;
+        sh = sh !== undefined ? sh : source.height;
 
         switch ($.currentImageMode) {
             case 'corner':
@@ -90,7 +107,7 @@ T5.addOns.image = ($, p) => {
             const tempCanvas = createTempCanvas(w, h);
 
             tempCanvas.clearRect(0, 0, w, h);
-            tempCanvas.drawImage(source, 0, 0, w, h);
+            tempCanvas.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
 
             const tintRGB = extractRGBFromColorString($.currentTint);
             const tintAlpha = extractAlphaFromColorString($.currentTint);
@@ -105,7 +122,8 @@ T5.addOns.image = ($, p) => {
             $.context.globalAlpha = 1; // Reset alpha to default
             $.context.restore();
         } else {
-            $.context.drawImage(source, x, y, w, h);
+            $.context.drawImage(source, sx, sy, sw, sh, x, y, w, h);
+            // $.context.drawImage(source, x, y, w, h);
         }
         return img;
     };
