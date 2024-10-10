@@ -1134,28 +1134,42 @@ T5.addOns.image = ($, p) => {
     class T5Image {
         constructor(img) {
             this.img = img;
-            this.width = img.width;
-            this.height = img.height;
+            this.width = 0; // Initialize width as 0
+            this.height = 0; // Initialize height as 0
+        }
+
+        // Method to update dimensions after load
+        setDimensions(width, height) {
+            this.width = width;
+            this.height = height;
         }
     }
+
 
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
         const img = new Image();
-        const t5Img = new T5Image(img);
         img.crossOrigin = 'Anonymous';
+
         img.onload = () => {
             window.t5PreloadDone++;
+
+            // Create the T5Image instance after the image has fully loaded
+            const t5Img = new T5Image(img);
+            t5Img.setDimensions(img.width, img.height); // Set dimensions here
+
             if (callback) {
-                callback(t5Img);
+                callback(t5Img); // Call the callback with the fully loaded image
             }
         };
+
         img.onerror = (err) => {
             window.t5PreloadDone++;
             console.error(`Failed to load image at path: ${path}. Please check your image path.`);
         };
-        img.src = path;
-        return t5Img;
+
+        img.src = path; // Set the source to start loading the image
+        return img;
     };
 
     let tmpCanvas = null;
@@ -1181,7 +1195,7 @@ T5.addOns.image = ($, p) => {
         return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
     }
 
-    $.image = function (img, x, y, w, h) {
+    $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
         let source;
         if (img instanceof T5Image) {
@@ -1199,6 +1213,9 @@ T5.addOns.image = ($, p) => {
 
         w = w ? (w) : (source.width) + offset;
         h = h ? (h) : (source.height) + offset;
+
+        sw = sw !== undefined ? sw : source.width;
+        sh = sh !== undefined ? sh : source.height;
 
         switch ($.currentImageMode) {
             case 'corner':
@@ -1219,7 +1236,7 @@ T5.addOns.image = ($, p) => {
             const tempCanvas = createTempCanvas(w, h);
 
             tempCanvas.clearRect(0, 0, w, h);
-            tempCanvas.drawImage(source, 0, 0, w, h);
+            tempCanvas.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
 
             const tintRGB = extractRGBFromColorString($.currentTint);
             const tintAlpha = extractAlphaFromColorString($.currentTint);
@@ -1234,7 +1251,8 @@ T5.addOns.image = ($, p) => {
             $.context.globalAlpha = 1; // Reset alpha to default
             $.context.restore();
         } else {
-            $.context.drawImage(source, x, y, w, h);
+            $.context.drawImage(source, sx, sy, sw, sh, x, y, w, h);
+            // $.context.drawImage(source, x, y, w, h);
         }
         return img;
     };
@@ -2332,169 +2350,169 @@ T5.addOns.math(T5.prototype, T5.prototype);
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-  $.defineConstant('NORMAL', 'normal');
-  $.defineConstant('ITALIC', 'italic');
-  $.defineConstant('BOLD', 'bold');
-  $.defineConstant('BOLDITALIC', 'italic bold');
-  $.defineConstant('CENTER', 'center');
-  $.defineConstant('MIDDLE', 'middle');
-  $.defineConstant('LEFT', 'left');
-  $.defineConstant('RIGHT', 'right');
-  $.defineConstant('TOP', 'top');
-  $.defineConstant('BOTTOM', 'bottom');
-  $.defineConstant('BASELINE', 'alphabetic');
-  $.defineConstant('WORD', 'word');
-  $.defineConstant('CHAR', 'char');
-  $.defineConstant('WRAP', 'wrap');
-  $.defineConstant('NOWRAP', 'nowrap');
+    $.defineConstant('NORMAL', 'normal');
+    $.defineConstant('ITALIC', 'italic');
+    $.defineConstant('BOLD', 'bold');
+    $.defineConstant('BOLDITALIC', 'italic bold');
+    $.defineConstant('CENTER', 'center');
+    $.defineConstant('MIDDLE', 'middle');
+    $.defineConstant('LEFT', 'left');
+    $.defineConstant('RIGHT', 'right');
+    $.defineConstant('TOP', 'top');
+    $.defineConstant('BOTTOM', 'bottom');
+    $.defineConstant('BASELINE', 'alphabetic');
+    $.defineConstant('WORD', 'word');
+    $.defineConstant('CHAR', 'char');
+    $.defineConstant('WRAP', 'wrap');
+    $.defineConstant('NOWRAP', 'nowrap');
 
-  $.textSizeVal = 12;
-  $.textAlignH = 'left';
-  $.textAlignV = 'alphabetic';
-  $.textLeadingVal = $.textSizeVal * 1.2;
-  $.textFontVal = 'sans-serif';
-  $.textStyleVal = 'normal';
-  $.textWrapVal = 'wrap';
-  $.textFillColor = '#000000';
-  $.textStrokeColor = '#000000';
+    $.textSizeVal = 12;
+    $.textAlignH = 'left';
+    $.textAlignV = 'alphabetic';
+    $.textLeadingVal = $.textSizeVal * 1.2;
+    $.textFontVal = 'sans-serif';
+    $.textStyleVal = 'normal';
+    $.textWrapVal = 'wrap';
+    $.textFillColor = '#000000';
+    $.textStrokeColor = '#000000';
 
-  $.textSize = function (size) {
-    [size] = $.scaleT5Coords([size]);
-    if (size !== undefined) {
-      $.textSizeVal = size;
-      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-    }
-    return $.textSizeVal;
-  };
-
-  $.textFont = function (font) {
-    if (font instanceof T5Font) {
-      font = font.family;
-    }
-    if (font !== undefined) {
-      $.textFontVal = font;
-      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-    }
-    return $.textFontVal;
-  };
-
-  $.textStyle = function (style) {
-    if (style !== undefined) {
-      $.textStyleVal = style;
-      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-    }
-    return $.textStyleVal;
-  };
-
-  $.textAlign = function (hAlign, vAlign) {
-    if (hAlign !== undefined) {
-      $.textAlignH = hAlign;
-    }
-    if (vAlign !== undefined) {
-      $.textAlignV = vAlign;
-    }
-    $.context.textAlign = $.textAlignH;
-    $.context.textBaseline = $.textAlignV;
-  };
-
-  $.textLeading = function (leading) {
-    [leading] = $.scaleT5Coords([leading]);
-    if (leading !== undefined) {
-      $.textLeadingVal = leading;
-    }
-    return $.textLeadingVal;
-  };
-
-  $.textWrap = function (wrapType) {
-    if (wrapType !== undefined) {
-      $.textWrapVal = wrapType;
-    }
-    return $.textWrapVal;
-  };
-
-  $.textWidth = function (str) {
-    return $.context.measureText(str).width;
-  };
-
-  $.textAscent = function () {
-    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-    return $.context.measureText("M").actualBoundingBoxAscent;
-  };
-
-  $.textDescent = function () {
-    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-    return $.context.measureText("g").actualBoundingBoxDescent;
-  };
-
-  $.text = function (str, x, y, maxWidth) {
-    [x, y] = $.scaleT5Coords([x, y]);
-    const lines = str.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
-        $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
-      } else {
-        if ($.context.strokeStyle && !$.noAlphaStroke) {
-          $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
+    $.textSize = function (size) {
+        [size] = $.scaleT5Coords([size]);
+        if (size !== undefined) {
+            $.textSizeVal = size;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
         }
-        if ($.context.fillStyle && !$.noAlphaFill) {
-          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-        }
-      }
-    }
-  };
+        return $.textSizeVal;
+    };
 
-  $.drawWrappedText = function (text, x, y, maxWidth) {
-    let words = text.split(' ');
-    let line = '';
-    for (let i = 0; i < words.length; i++) {
-      let testLine = line + words[i] + ' ';
-      let metrics = $.context.measureText(testLine);
-      let testWidth = metrics.width;
-      if (testWidth > maxWidth && i > 0) {
-        if ($.context.strokeStyle && !$.noAlphaStroke) {
-          $.context.strokeText(line, x, y);
+    $.textFont = function (font) {
+        if (font instanceof T5Font) {
+            font = font.family;
         }
-        if ($.context.fillStyle && !$.noAlphaFill) {
-          $.context.fillText(line, x, y);
+        if (font !== undefined) {
+            $.textFontVal = font;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
         }
-        line = words[i] + ' ';
-        y += $.textLeadingVal;
-      } else {
-        line = testLine;
-      }
-    }
-    if ($.context.strokeStyle) {
-      $.context.strokeText(line, x, y);
-    }
-    if ($.context.fillStyle) {
-      $.context.fillText(line, x, y);
-    }
-  };
+        return $.textFontVal;
+    };
 
-  class T5Font {
-    constructor(font, family) {
-      this.font = font;
-      this.family = family;
-    }
-  }
+    $.textStyle = function (style) {
+        if (style !== undefined) {
+            $.textStyleVal = style;
+            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        }
+        return $.textStyleVal;
+    };
 
-  $.loadFont = function (path, callback) {
-    window.t5PreloadCount++;
-    const family = 'CustomFont' + window.t5PreloadCount;
-    const font = new FontFace(family, `url(${path})`);
-    const t5Font = new T5Font(font, family);
-    font.load().then((loadedFont) => {
-      document.fonts.add(loadedFont);
-      window.t5PreloadDone++;
-      if (callback) {
-        callback(t5Font);
-      }
-    }).catch((error) => {
-      window.t5PreloadDone++;
-      console.error(`Failed to load font at path: ${path}. Error: ${error}`);
-    });
-    return t5Font;
-  };
+    $.textAlign = function (hAlign, vAlign) {
+        if (hAlign !== undefined) {
+            $.textAlignH = hAlign;
+        }
+        if (vAlign !== undefined) {
+            $.textAlignV = vAlign;
+        }
+        $.context.textAlign = $.textAlignH;
+        $.context.textBaseline = $.textAlignV;
+    };
+
+    $.textLeading = function (leading) {
+        [leading] = $.scaleT5Coords([leading]);
+        if (leading !== undefined) {
+            $.textLeadingVal = leading;
+        }
+        return $.textLeadingVal;
+    };
+
+    $.textWrap = function (wrapType) {
+        if (wrapType !== undefined) {
+            $.textWrapVal = wrapType;
+        }
+        return $.textWrapVal;
+    };
+
+    $.textWidth = function (str) {
+        return $.context.measureText(str).width;
+    };
+
+    $.textAscent = function () {
+        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        return $.context.measureText("M").actualBoundingBoxAscent;
+    };
+
+    $.textDescent = function () {
+        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+        return $.context.measureText("g").actualBoundingBoxDescent;
+    };
+
+    $.text = function (str, x, y, maxWidth) {
+        [x, y] = $.scaleT5Coords([x, y]);
+        const lines = str.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+            } else {
+                if ($.context.strokeStyle && !$.noAlphaStroke) {
+                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
+                }
+                if ($.context.fillStyle && !$.noAlphaFill) {
+                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
+                }
+            }
+        }
+    };
+
+    $.drawWrappedText = function (text, x, y, maxWidth) {
+        let words = text.split(' ');
+        let line = '';
+        for (let i = 0; i < words.length; i++) {
+            let testLine = line + words[i] + ' ';
+            let metrics = $.context.measureText(testLine);
+            let testWidth = metrics.width;
+            if (testWidth > maxWidth && i > 0) {
+                if ($.context.strokeStyle && !$.noAlphaStroke) {
+                    $.context.strokeText(line, x, y);
+                }
+                if ($.context.fillStyle && !$.noAlphaFill) {
+                    $.context.fillText(line, x, y);
+                }
+                line = words[i] + ' ';
+                y += $.textLeadingVal;
+            } else {
+                line = testLine;
+            }
+        }
+        if ($.context.strokeStyle) {
+            $.context.strokeText(line, x, y);
+        }
+        if ($.context.fillStyle) {
+            $.context.fillText(line, x, y);
+        }
+    };
+
+    class T5Font {
+        constructor(font, family) {
+            this.font = font;
+            this.family = family;
+        }
+    }
+
+    $.loadFont = function (path, callback) {
+        window.t5PreloadCount++;
+        const family = 'CustomFont' + window.t5PreloadCount;
+        const font = new FontFace(family, `url(${path})`);
+        const t5Font = new T5Font(font, family);
+        font.load().then((loadedFont) => {
+            document.fonts.add(loadedFont);
+            window.t5PreloadDone++;
+            if (callback) {
+                callback(t5Font);
+            }
+        }).catch((error) => {
+            window.t5PreloadDone++;
+            console.error(`Failed to load font at path: ${path}. Error: ${error}`);
+        });
+        return t5Font;
+    };
 
 };
 
@@ -3078,7 +3096,7 @@ T5.addOns.dom = ($, p, globalScope) => {
         };
     }
 
-  
+
 
     class T5Dom {
         constructor() {
@@ -3567,7 +3585,7 @@ T5.addOns.input = ($, p, globalScope) => {
     if (!('noCursor' in window)) {
         globalScope.noCursor = () => t5Input.noCursor();
     }
-    
+
     $.disableContextMenu = function () {
         if ($.canvas) {
             $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
