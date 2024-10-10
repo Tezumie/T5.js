@@ -43,6 +43,30 @@ T5.addOns.image = ($, p) => {
         return img;
     };
 
+    $.createImage = function (width, height, bgColor = null) {
+        // Create a new canvas element with the given dimensions
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+
+        // Get the 2D context for drawing
+        const context = canvas.getContext('2d');
+
+        // If a background color is provided, fill the canvas with that color
+        if (bgColor) {
+            $.fill(bgColor)
+            context.fillRect(0, 0, width, height);
+        }
+
+        // Create a new T5Image instance using the canvas as the image source
+        const newImage = new T5Image(canvas);
+        newImage.drawingContext = context
+        // Set the dimensions of the T5Image instance
+        newImage.setDimensions(width, height);
+
+        return newImage; // Return the created image
+    };
+
     let tmpCanvas = null;
     function createTempCanvas(width, height) {
         if (tmpCanvas != null) {
