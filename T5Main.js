@@ -1019,7 +1019,7 @@ T5.addOns.colors = ($, p) => {
         return obj instanceof ColorRGBA;
     };
 
-    function handleColorArgument(args) {
+    $.handleColorArgument = function handleColorArgument(args) {
         let colorObj;
         if (args.length === 1 && $.isColorObject(args[0])) {
             colorObj = args[0];
