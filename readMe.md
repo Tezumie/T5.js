@@ -59,6 +59,11 @@ You can use `<script src="T5Main.js"></script>` to access all of the available f
 Optionally, you can select which features you want and omit all the others. Individual libraries can be found in the T5 folder.
 
 
+T5 is now compatible with p5 Sound.
+
+```html
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.10.0/addons/p5.sound.min.js"></script>
+```
 ### Basic Setup
 
 Here's a simple example to get you started with T5.js:
