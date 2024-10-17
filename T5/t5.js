@@ -8,9 +8,24 @@ window.t5PreloadCount = 0;
 window.t5PreloadDone = 0;
 window.windowWidth = window.innerWidth;
 window.windowHeight = window.innerHeight;
+p5 = T5;
+T5.methods = {
+    init: [],
+    pre: [],
+    post: [],
+    remove: []
+};
+T5.prototype.registerPreloadMethod = (methodName, functionObject) => {
+    T5.prototype[methodName] = functionObject[methodName];
+};
+
+T5.prototype.registerMethod = (methodName, functionObject) => {
+    T5.methods[methodName].push(functionObject);
+};
 
 function T5(scope = 'global', parent) {
     let $ = this;
+
     function setScope(scope) {
         if (scope === 'auto') {
             scope = (window.setup || window.draw) ? 'global' : 'local';
@@ -38,6 +53,12 @@ function T5(scope = 'global', parent) {
     $._shouldDrawOnce = false;
     let millisBegin = performance.now();
     $.millis = () => performance.now() - millisBegin;
+    $._incrementPreload = function () {
+        window.t5PreloadCount++;
+    };
+    $._decrementPreload = function () {
+        window.t5PreloadCount--;
+    };
 
     $.frameRate = (rate) => {
         if (rate !== undefined) {
@@ -49,6 +70,10 @@ function T5(scope = 'global', parent) {
     };
 
     function _draw() {
+        for (let preMethod of T5.methods.pre) {
+            preMethod.call($);
+        }
+
         $.resetMatrix();
         let now = performance.now();
         $._previousFrame ??= now - $._frameLength;
@@ -99,6 +124,9 @@ function T5(scope = 'global', parent) {
 
         $._previousFrame = now;
         $._shouldDrawOnce = false;
+        for (let postMethod of T5.methods.post) {
+            postMethod.call($);
+        }
     }
 
     $.noLoop = () => { $._isLooping = false; };
@@ -113,6 +141,7 @@ function T5(scope = 'global', parent) {
     };
 
     $.start = () => {
+
         if (typeof $.preload === 'function') {
             $.preload();
         }
@@ -123,6 +152,9 @@ function T5(scope = 'global', parent) {
 
             if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
             $.resetMatrix();
+            for (let initMethod of T5.methods.init) {
+                initMethod.call($);
+            }
 
             $._shouldDrawOnce = true;
             requestAnimationFrame(() => {
@@ -138,6 +170,9 @@ function T5(scope = 'global', parent) {
 
                     if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
                     $.resetMatrix();
+                    for (let initMethod of T5.methods.init) {
+                        initMethod.call($);
+                    }
 
                     $._shouldDrawOnce = true;
                     requestAnimationFrame(() => {
@@ -164,6 +199,7 @@ function T5(scope = 'global', parent) {
         T5.addOns[m]($, proxy, globalScope);
     }
 
+
     if ($._globalSketch) {
         globalScope.T5 = T5;
         window.addEventListener('resize', () => {
@@ -171,6 +207,7 @@ function T5(scope = 'global', parent) {
             window.windowHeight = window.innerHeight;
             if (typeof $.windowResized === 'function') $.windowResized();
         });
+
     }
 
 }
@@ -182,6 +219,8 @@ if (typeof window === 'object') {
     document.addEventListener('DOMContentLoaded', () => {
         if (!T5._hasGlobal) {
             const instance = new T5('global');
+            p5 = T5
+
             instance.setup = window.setup;
             instance.draw = window.draw;
             instance.windowResized = window.windowResized;
