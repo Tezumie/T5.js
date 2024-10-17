@@ -3,6 +3,8 @@
 //************************************************************************//
 class T5Element {
     constructor(element) {
+        this.canvas = element;
+        this.elt = element;
         this.element = element;
         this._eventHandlers = {};
     }
