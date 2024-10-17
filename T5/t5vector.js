@@ -193,6 +193,16 @@ T5.addOns.vector = ($, p, globalScope) => {
             return Math.abs(u.x - this.x) < epsilon && Math.abs(u.y - this.y) < epsilon && Math.abs(u.z - this.z) < epsilon;
         }
 
+        reflect(n) {
+            n.normalize();
+            return this.sub(n.mult(2 * this.dot(n)));
+        }
+        
+        static reflect(v, n) {
+            n = n.copy().normalize();
+            return v.copy().sub(n.mult(2 * v.dot(n)));
+        }
+
         static fromAngle(th, l = 1) {
             let v = new Vector();
             v.x = l * Math.cos(th);
