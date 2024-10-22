@@ -65,6 +65,7 @@ T5.addOns.math = ($, p) => {
     $.degrees = (radians) => radians * (180 / Math.PI);
     $.radians = (degrees) => degrees * (Math.PI / 180);
     $.map = (value, start1, stop1, start2, stop2) => start2 + (stop2 - start2) * ((value - start1) / (stop1 - start1));
+    $.norm = (value, start, stop) => (value - start) / (stop - start);
     $.lerp = (start, stop, amt) => start + (stop - start) * amt;
     $.int = (n) => n < 0 ? Math.ceil(n) : Math.floor(n);
     $.dist = (x1, y1, x2, y2) => {
