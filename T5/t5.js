@@ -19,7 +19,10 @@ T5.prototype.registerPreloadMethod = (methodName, functionObject) => {
     T5.prototype[methodName] = functionObject[methodName];
 };
 
-T5.prototype.registerMethod = (methodName, functionObject) => {
+T5.prototype.registerMethod = function (methodName, functionObject) {
+    if (!T5.methods[methodName]) {
+        T5.methods[methodName] = [];
+    }
     T5.methods[methodName].push(functionObject);
 };
 
@@ -143,6 +146,7 @@ function T5(scope = 'global', parent) {
     $.start = () => {
 
         if (typeof $.preload === 'function') {
+            bindGlobals($)
             $.preload();
         }
         // Check if preload function exists and if there are items to preload
@@ -152,10 +156,6 @@ function T5(scope = 'global', parent) {
 
             if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
             $.resetMatrix();
-            for (let initMethod of T5.methods.init) {
-                initMethod.call($);
-            }
-
             $._shouldDrawOnce = true;
             requestAnimationFrame(() => {
                 _draw();
@@ -170,10 +170,6 @@ function T5(scope = 'global', parent) {
 
                     if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
                     $.resetMatrix();
-                    for (let initMethod of T5.methods.init) {
-                        initMethod.call($);
-                    }
-
                     $._shouldDrawOnce = true;
                     requestAnimationFrame(() => {
                         _draw();
@@ -195,10 +191,27 @@ function T5(scope = 'global', parent) {
 
     document.addEventListener('DOMContentLoaded', $.start);
 
+    if (T5.methods.init) {
+        for (let initMethod of T5.methods.init) {
+            if (typeof initMethod === 'function') {
+                initMethod.call($);
+            }
+        }
+    }
+
     for (let m in T5.addOns) {
         T5.addOns[m]($, proxy, globalScope);
     }
 
+    function bindGlobals($) {
+        for (let key in $) {
+            if ($[key] instanceof Function) {
+                window[key] = $[key].bind($);
+            } else {
+                window[key] = $[key];  // Bind non-function properties too
+            }
+        }
+    }
 
     if ($._globalSketch) {
         globalScope.T5 = T5;
