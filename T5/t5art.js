@@ -9,7 +9,6 @@ T5.addOns.art = ($, p) => {
         let gradient;
         let startX, startY, endX, endY, radius;
 
-        // Extract coordinates and radius based on the gradient type
         if (type === $.LINEAR) {
             ({ startX, startY, endX, endY } = config[0]);
             [startX, startY, endX, endY] = $.scaleT5Coords([startX, startY, endX, endY]);
@@ -24,15 +23,20 @@ T5.addOns.art = ($, p) => {
             throw new Error('Invalid gradient type');
         }
 
-        // Add color stops
         for (let i = 1; i < config.length; i++) {
             const { colorStop, color } = config[i];
             const parsedColor = $.color(color);
+
+            if (!parsedColor || parsedColor.levels[3] === 0) {
+                continue;
+            }
+
             gradient.addColorStop(colorStop, parsedColor.toString());
         }
 
         return gradient;
     }
+
 
     $.gradientFill = function (type, config) {
         const gradient = createT5Gradient(type, config);
