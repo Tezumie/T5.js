@@ -25,18 +25,16 @@ T5.addOns.art = ($, p) => {
 
         for (let i = 1; i < config.length; i++) {
             const { colorStop, color } = config[i];
-            const parsedColor = $.color(color);
+            const colorObj = handleColorArgument([color]);
 
-            if (!parsedColor || parsedColor.levels[3] === 0) {
-                continue;
-            }
+            if (!colorObj || colorObj.levels[3] === 0) continue;
 
-            gradient.addColorStop(colorStop, parsedColor.toString());
+            const colorString = colorObj.toString();
+            gradient.addColorStop(colorStop, colorString);
         }
 
         return gradient;
     }
-
 
     $.gradientFill = function (type, config) {
         const gradient = createT5Gradient(type, config);
@@ -286,7 +284,7 @@ T5.addOns.art = ($, p) => {
             return;
         }
 
-        const fillColor = handleColorArgument(colorArgs);
+        const fillColor = $.handleColorArgument(colorArgs);
         if (!fillColor) {
             console.warn('Invalid fill color');
             return;
@@ -341,16 +339,6 @@ T5.addOns.art = ($, p) => {
     function colorsMatch(a, b) {
         return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
     }
-
-    function handleColorArgument(args) {
-        if (args.length === 1 && $.isColorObject(args[0])) {
-            return args[0].toString();
-        } else {
-            const colorObj = $.color(...args);
-            return colorObj ? colorObj.toString() : null;
-        }
-    }
-
 };
 
 T5.addOns.art(T5.prototype, T5.prototype);
