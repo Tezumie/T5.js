@@ -4216,7 +4216,7 @@ T5.addOns.art = ($, p) => {
             return;
         }
 
-        const fillColor = $.handleColorArgument(colorArgs);
+        const fillColor = handleColArgument(colorArgs);
         if (!fillColor) {
             console.warn('Invalid fill color');
             return;
@@ -4270,6 +4270,14 @@ T5.addOns.art = ($, p) => {
 
     function colorsMatch(a, b) {
         return a[0] === b[0] && a[1] === b[1] && a[2] === b[2] && a[3] === b[3];
+    }
+    function handleColArgument(args) {
+        if (args.length === 1 && $.isColorObject(args[0])) {
+            return args[0].toString();
+        } else {
+            const colorObj = $.color(...args);
+            return colorObj ? colorObj.toString() : null;
+        }
     }
 };
 
