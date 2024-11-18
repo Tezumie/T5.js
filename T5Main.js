@@ -146,7 +146,7 @@ function T5(scope = 'global', parent) {
     $.start = () => {
 
         if (typeof $.preload === 'function') {
-            bindGlobals($)
+            // bindGlobals($)
             $.preload();
         }
         // Check if preload function exists and if there are items to preload
