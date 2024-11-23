@@ -61,7 +61,11 @@ T5.addOns.text = ($, p) => {
       $.textAlignH = hAlign;
     }
     if (vAlign !== undefined) {
-      $.textAlignV = vAlign;
+      if (vAlign == 'center') {
+        $.textAlignV = 'middle'
+      } else {
+        $.textAlignV = vAlign;
+      }
     }
     $.context.textAlign = $.textAlignH;
     $.context.textBaseline = $.textAlignV;
