@@ -1185,11 +1185,10 @@ T5.addOns.image = ($, p) => {
     class T5Image {
         constructor(img) {
             this.img = img;
-            this.width = 0; // Initialize width as 0
-            this.height = 0; // Initialize height as 0
+            this.width = 0;
+            this.height = 0;
         }
 
-        // Method to update dimensions after load
         setDimensions(width, height) {
             this.width = width;
             this.height = height;
@@ -1205,12 +1204,11 @@ T5.addOns.image = ($, p) => {
         img.onload = () => {
             window.t5PreloadDone++;
 
-            // Create the T5Image instance after the image has fully loaded
             const t5Img = new T5Image(img);
-            t5Img.setDimensions(img.width, img.height); // Set dimensions here
+            t5Img.setDimensions(img.width, img.height);
 
             if (callback) {
-                callback(t5Img); // Call the callback with the fully loaded image
+                callback(t5Img);
             }
         };
 
@@ -1219,44 +1217,40 @@ T5.addOns.image = ($, p) => {
             console.error(`Failed to load image at path: ${path}. Please check your image path.`);
         };
 
-        img.src = path; // Set the source to start loading the image
+        img.src = path;
         return img;
     };
 
     $.createImage = function (width, height, bgColor = null) {
-        // Create a new canvas element with the given dimensions
         const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
 
-        // Get the 2D context for drawing
         const context = canvas.getContext('2d');
 
-        // If a background color is provided, fill the canvas with that color
         if (bgColor) {
             $.fill(bgColor)
             context.fillRect(0, 0, width, height);
         }
 
-        // Create a new T5Image instance using the canvas as the image source
         const newImage = new T5Image(canvas);
         newImage.drawingContext = context
-        // Set the dimensions of the T5Image instance
         newImage.setDimensions(width, height);
 
-        return newImage; // Return the created image
+        return newImage;
     };
 
     let tmpCanvas = null;
+
     function createTempCanvas(width, height) {
         if (tmpCanvas != null) {
-            return tmpCanvas.tmpCtx
+            return tmpCanvas.tmpCtx;
         } else {
             tmpCanvas = document.createElement('canvas');
             tmpCanvas.tmpCtx = tmpCanvas.getContext('2d');
             tmpCanvas.width = width;
             tmpCanvas.height = height;
-            return tmpCanvas.tmpCtx
+            return tmpCanvas.tmpCtx;
         }
     }
 
@@ -1272,6 +1266,7 @@ T5.addOns.image = ($, p) => {
 
     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
+
         let source;
         if (img instanceof T5Image) {
             source = img.img;
@@ -1284,10 +1279,9 @@ T5.addOns.image = ($, p) => {
         } else {
             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
-        let offset = (0.0);
 
-        w = w ? (w) : (source.width) + offset;
-        h = h ? (h) : (source.height) + offset;
+        w = w !== undefined ? w : source.width;
+        h = h !== undefined ? h : source.height;
 
         sw = sw !== undefined ? sw : source.width;
         sh = sh !== undefined ? sh : source.height;
@@ -1308,29 +1302,28 @@ T5.addOns.image = ($, p) => {
         [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
 
         if ($.currentTint) {
-            const tempCanvas = createTempCanvas(w, h);
+            const tempCtx = createTempCanvas(sw, sh);
+            tempCtx.clearRect(0, 0, sw, sh);
 
-            tempCanvas.clearRect(0, 0, w, h);
-            tempCanvas.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
+            tempCtx.globalCompositeOperation = 'source-over';
+            tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
             const tintRGB = extractRGBFromColorString($.currentTint);
-            const tintAlpha = extractAlphaFromColorString($.currentTint);
+            tempCtx.globalCompositeOperation = 'multiply';
+            tempCtx.fillStyle = tintRGB;
+            tempCtx.fillRect(0, 0, sw, sh);
 
-            tempCanvas.globalCompositeOperation = 'multiply';
-            tempCanvas.fillStyle = tintRGB;
-            tempCanvas.fillRect(0, 0, w, h);
+            tempCtx.globalCompositeOperation = 'destination-in';
+            tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
-            $.context.save();
-            $.context.globalAlpha = tintAlpha;
-            $.context.drawImage(tempCanvas.canvas, x, y, w, h);
-            $.context.globalAlpha = 1; // Reset alpha to default
-            $.context.restore();
+            $.context.drawImage(tempCtx.canvas, 0, 0, sw, sh, x, y, w, h);
         } else {
             $.context.drawImage(source, sx, sy, sw, sh, x, y, w, h);
-            // $.context.drawImage(source, x, y, w, h);
         }
+
         return img;
     };
+
 
 };
 
