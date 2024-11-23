@@ -668,7 +668,7 @@ T5.addOns.canvas = ($, p) => {
         tmpCanvas.width = $.canvas.width;
         tmpCanvas.height = $.canvas.height;
 
-        tmpCtx.drawImage($.canvas, 0, 0, $.canvas.width / $.t5PixelDensity, $.canvas.height / $.t5PixelDensity);
+        tmpCtx.drawImage($.canvas, 0, 0, $.canvas.width, $.canvas.height);
 
         const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
         const data = imageData.data;
