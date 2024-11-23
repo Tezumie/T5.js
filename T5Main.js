@@ -1259,11 +1259,6 @@ T5.addOns.image = ($, p) => {
         return rgbaMatch ? `rgb(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]})` : colorString;
     }
 
-    function extractAlphaFromColorString(colorString) {
-        const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
-        return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
-    }
-
     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
 
@@ -2478,7 +2473,11 @@ T5.addOns.text = ($, p) => {
             $.textAlignH = hAlign;
         }
         if (vAlign !== undefined) {
-            $.textAlignV = vAlign;
+            if (vAlign == 'center') {
+                $.textAlignV = 'middle'
+            } else {
+                $.textAlignV = vAlign;
+            }
         }
         $.context.textAlign = $.textAlignH;
         $.context.textBaseline = $.textAlignV;
