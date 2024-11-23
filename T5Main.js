@@ -668,7 +668,7 @@ T5.addOns.canvas = ($, p) => {
         tmpCanvas.width = $.canvas.width;
         tmpCanvas.height = $.canvas.height;
 
-        tmpCtx.drawImage($.canvas, 0, 0);
+        tmpCtx.drawImage($.canvas, 0, 0, $.canvas.width / $.t5PixelDensity, $.canvas.height / $.t5PixelDensity);
 
         const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
         const data = imageData.data;
@@ -1242,7 +1242,6 @@ T5.addOns.image = ($, p) => {
         }
     }
 
-
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
         const img = new Image();
@@ -1306,6 +1305,11 @@ T5.addOns.image = ($, p) => {
         return rgbaMatch ? `rgb(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]})` : colorString;
     }
 
+    function extractAlphaFromColorString(colorString) {
+        const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+        return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
+    }
+
     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
 
@@ -1327,6 +1331,8 @@ T5.addOns.image = ($, p) => {
 
         sw = sw !== undefined ? sw : source.width;
         sh = sh !== undefined ? sh : source.height;
+        sw *= $.t5PixelDensity
+        sh *= $.t5PixelDensity
 
         switch ($.currentImageMode) {
             case 'corner':
@@ -1351,6 +1357,7 @@ T5.addOns.image = ($, p) => {
             tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
             const tintRGB = extractRGBFromColorString($.currentTint);
+            const tintAlpha = extractAlphaFromColorString($.currentTint);
             tempCtx.globalCompositeOperation = 'multiply';
             tempCtx.fillStyle = tintRGB;
             tempCtx.fillRect(0, 0, sw, sh);
@@ -1358,7 +1365,11 @@ T5.addOns.image = ($, p) => {
             tempCtx.globalCompositeOperation = 'destination-in';
             tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
+            $.context.save();
+            $.context.globalAlpha = tintAlpha;
             $.context.drawImage(tempCtx.canvas, 0, 0, sw, sh, x, y, w, h);
+            $.context.globalAlpha = 1;
+            $.context.restore();
         } else {
             $.context.drawImage(source, sx, sy, sw, sh, x, y, w, h);
         }
