@@ -6,7 +6,7 @@ function setup() {
   createCanvas(window.innerWidth, window.innerWidth);
   noStroke();
   noLoop();
-  pixelDensity(2)
+  // pixelDensity(2)
 
   // Define filters to apply
   let filters = [GRAY, INVERT, THRESHOLD, POSTERIZE, BLUR, ERODE, DILATE, OPAQUE]
