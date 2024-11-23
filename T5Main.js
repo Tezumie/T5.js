@@ -655,6 +655,10 @@ T5.addOns.canvas = ($, p) => {
     $.defineConstant('DILATE', 'DILATE');
     $.defineConstant('ERODE', 'ERODE');
     $.defineConstant('BLUR', 'BLUR');
+    $.defineConstant('SEPIA', 'SEPIA');
+    $.defineConstant('BRIGHTNESS', 'BRIGHTNESS');
+    $.defineConstant('SATURATION', 'SATURATION');
+    $.defineConstant('CONTRAST', 'CONTRAST');
 
     $.filter = function (mode, value) {
         if (!$.context) return;
@@ -668,14 +672,14 @@ T5.addOns.canvas = ($, p) => {
 
         const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
         const data = imageData.data;
+        const width = tmpCanvas.width;
+        const height = tmpCanvas.height;
 
         switch (mode) {
             case GRAY:
                 for (let i = 0; i < data.length; i += 4) {
                     const gray = 0.155 * data[i] + 0.597 * data[i + 1] + 0.319 * data[i + 2];
-                    data[i] = gray;
-                    data[i + 1] = gray;
-                    data[i + 2] = gray;
+                    data[i] = data[i + 1] = data[i + 2] = gray;
                 }
                 break;
 
@@ -691,15 +695,13 @@ T5.addOns.canvas = ($, p) => {
                 if (value < 2 || value > 255) {
                     throw new Error('Posterize value must be between 2 and 255');
                 }
-                let lvl = value;
-                let lvl1 = lvl - 1;
+                const levels = value;
+                const levelsMinusOne = levels - 1;
                 for (let i = 0; i < data.length; i += 4) {
-                    data[i] = (((data[i] * lvl) >> 8) * 255) / lvl1;
-                    data[i + 1] = (((data[i + 1] * lvl) >> 8) * 255) / lvl1;
-                    data[i + 2] = (((data[i + 2] * lvl) >> 8) * 255) / lvl1;
+                    data[i] = ((data[i] * levels) >> 8) * 255 / levelsMinusOne;
+                    data[i + 1] = ((data[i + 1] * levels) >> 8) * 255 / levelsMinusOne;
+                    data[i + 2] = ((data[i + 2] * levels) >> 8) * 255 / levelsMinusOne;
                 }
-                tmpCtx.putImageData(imageData, 0, 0);
-                $.ctx.drawImage(tmpCanvas, 0, 0);
                 break;
 
             case THRESHOLD:
@@ -707,22 +709,42 @@ T5.addOns.canvas = ($, p) => {
                 for (let i = 0; i < data.length; i += 4) {
                     const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
                     const val = avg >= threshold ? 255 : 0;
-                    data[i] = val;
-                    data[i + 1] = val;
-                    data[i + 2] = val;
+                    data[i] = data[i + 1] = data[i + 2] = val;
                 }
                 break;
 
             case OPAQUE:
                 for (let i = 0; i < data.length; i += 4) {
-                    data[i + 3] = 255;
+                    data[i + 3] = 255; // Set alpha to fully opaque
                 }
                 break;
 
-            case BLUR:
             case DILATE:
             case ERODE:
-                $.context.filter = mode.toLowerCase() + (value ? `(${value}px)` : '');
+                applyMorphologicalFilter(data, width, height, mode === DILATE);
+                break;
+
+            case BLUR:
+            case SEPIA:
+            case BRIGHTNESS:
+            case SATURATION:
+            case CONTRAST:
+                // Use CSS filter for supported modes
+                let cssFilter = '';
+                if (mode === BLUR) {
+                    const radius = Math.ceil(value) || 1;
+                    cssFilter = `blur(${radius}px)`;
+                } else if (mode === SEPIA) {
+                    cssFilter = `sepia(${value ?? 1})`;
+                } else if (mode === BRIGHTNESS) {
+                    cssFilter = `brightness(${value ?? 1})`;
+                } else if (mode === SATURATION) {
+                    cssFilter = `saturate(${value ?? 1})`;
+                } else if (mode === CONTRAST) {
+                    cssFilter = `contrast(${value ?? 1})`;
+                }
+
+                $.context.filter = cssFilter;
                 $.context.drawImage(tmpCanvas, 0, 0);
                 $.context.filter = 'none';
                 return;
@@ -734,6 +756,31 @@ T5.addOns.canvas = ($, p) => {
         tmpCtx.putImageData(imageData, 0, 0);
         $.context.drawImage(tmpCanvas, 0, 0);
     };
+
+    function applyMorphologicalFilter(data, width, height, isDilate) {
+        const copyData = new Uint8ClampedArray(data);
+        const pixel = (x, y, c) => copyData[(y * width + x) * 4 + c];
+        const setPixel = (x, y, c, value) => { data[(y * width + x) * 4 + c] = value; };
+
+        for (let y = 1; y < height - 1; y++) {
+            for (let x = 1; x < width - 1; x++) {
+                for (let c = 0; c < 3; c++) {
+                    let extreme = isDilate ? 0 : 255;
+                    for (let ky = -1; ky <= 1; ky++) {
+                        for (let kx = -1; kx <= 1; kx++) {
+                            const val = pixel(x + kx, y + ky, c);
+                            if (isDilate) {
+                                extreme = Math.max(extreme, val);
+                            } else {
+                                extreme = Math.min(extreme, val);
+                            }
+                        }
+                    }
+                    setPixel(x, y, c, extreme);
+                }
+            }
+        }
+    }
 
     $.defineConstant('LABEL', 'LABEL');
     $.defineConstant('FALLBACK', 'FALLBACK');
