@@ -668,7 +668,7 @@ T5.addOns.canvas = ($, p) => {
         tmpCanvas.width = $.canvas.width;
         tmpCanvas.height = $.canvas.height;
 
-        tmpCtx.drawImage($.canvas, 0, 0, $.canvas.width, $.canvas.height);
+        tmpCtx.drawImage($.canvas, 0, 0, $.canvas.width / $.t5PixelDensity, $.canvas.height / $.t5PixelDensity);
 
         const imageData = tmpCtx.getImageData(0, 0, tmpCanvas.width, tmpCanvas.height);
         const data = imageData.data;
@@ -1326,11 +1326,11 @@ T5.addOns.image = ($, p) => {
             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
 
-        w = w !== undefined ? w : source.width;
-        h = h !== undefined ? h : source.height;
+        w = w !== undefined ? w : source.width / $.t5PixelDensity;
+        h = h !== undefined ? h : source.height / $.t5PixelDensity;
 
-        sw = sw !== undefined ? sw : source.width;
-        sh = sh !== undefined ? sh : source.height;
+        sw = sw !== undefined ? sw : source.width / $.t5PixelDensity;
+        sh = sh !== undefined ? sh : source.height / $.t5PixelDensity;
         sw *= $.t5PixelDensity
         sh *= $.t5PixelDensity
 
@@ -1381,47 +1381,6 @@ T5.addOns.image = ($, p) => {
 };
 
 T5.addOns.image(T5.prototype, T5.prototype);
-
-//************************************************************************//
-//*******************************-T5Strings-******************************//
-//************************************************************************//
-T5.addOns.strings = ($, p) => {
-    class T5Strings {
-        constructor(lines) {
-            this.lines = lines;
-        }
-    }
-
-    $.loadStrings = function (path, callback) {
-        window.t5PreloadCount++;
-        const t5Strings = [];
-
-        fetch(path)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Failed to load strings from path: ${path}. Please check your file path.`);
-                }
-                return response.text();
-            })
-            .then(text => {
-                const lines = text.split(/\r?\n/);
-                lines.forEach(line => t5Strings.push(line));
-                window.t5PreloadDone++;
-                if (callback) {
-                    callback(t5Strings);
-                }
-            })
-            .catch(error => {
-                window.t5PreloadDone++;
-                console.error(error.message);
-            });
-
-        return t5Strings;
-    };
-};
-
-T5.addOns.strings(T5.prototype, T5.prototype);
-
 //************************************************************************//
 //********************************-T5Draw-********************************//
 //************************************************************************//
