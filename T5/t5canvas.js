@@ -414,6 +414,7 @@ T5.addOns.canvas = ($, p) => {
     $.defineConstant('BRIGHTNESS', 'BRIGHTNESS');
     $.defineConstant('SATURATION', 'SATURATION');
     $.defineConstant('CONTRAST', 'CONTRAST');
+    $.defineConstant('HUE_ROTATE', 'HUE_ROTATE');
 
     $.filter = function (mode, value) {
         if (!$.context) return;
@@ -484,6 +485,7 @@ T5.addOns.canvas = ($, p) => {
             case BRIGHTNESS:
             case SATURATION:
             case CONTRAST:
+            case HUE_ROTATE:
                 // Use CSS filter for supported modes
                 let cssFilter = '';
                 if (mode === BLUR) {
@@ -497,6 +499,9 @@ T5.addOns.canvas = ($, p) => {
                     cssFilter = `saturate(${value ?? 1})`;
                 } else if (mode === CONTRAST) {
                     cssFilter = `contrast(${value ?? 1})`;
+                } else if (mode === HUE_ROTATE) {
+                    const unit = $.currentAngleMode === "radians" ? 'rad' : 'deg';
+                    cssFilter = `hue-rotate(${value}${unit})`;
                 }
 
                 $.context.filter = cssFilter;
