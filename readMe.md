@@ -4,6 +4,10 @@
 
 # T5.js Documentation
 
+## Important Note
+
+**T5JS** is a personal project for experimentation and learning. It is subject to change, and backward compatibility may be an issue if used via a content delivery network (CDN). For a more stable experience, it is recommended to download and use your own version of **T5JS**.
+
 ## Overview
 
 T5.js is a lightweight and simplified 2D graphics library designed for drawing on the canvas. Inspired by p5.js, T5.js uses similar function names for ease of use and familiarity, along with some new functions. It focuses on providing an intuitive API for creating and manipulating 2D graphics with minimal setup and overhead. 
