@@ -2,7 +2,8 @@
 //*******************************-T5Input-********************************//
 //************************************************************************//
 T5.addOns.input = ($, p, globalScope) => {
-    globalScope = $
+    globalScope = window
+    // Define constants
     $.defineConstant('UP_ARROW', 38);
     $.defineConstant('DOWN_ARROW', 40);
     $.defineConstant('LEFT_ARROW', 37);
@@ -24,305 +25,282 @@ T5.addOns.input = ($, p, globalScope) => {
     $.defineConstant('MOVE', 'move');
     $.defineConstant('TEXT', 'text');
 
-    class T5Input {
-        constructor() {
-            this.keysPressed = new Set();
-            this.keyIsPressed = false;
-            this.key = '';
-            this.keyCode = 0;
-            this.mouseButton = '';
-            this.mouseIsPressed = false;
-            this.movedX = 0;
-            this.movedY = 0;
-            this._mouseX = 0;
-            this._mouseY = 0;
-            this._pmouseX = 0;
-            this._pmouseY = 0;
-            this._winMouseX = 0;
-            this._winMouseY = 0;
-            this._pwinMouseX = 0;
-            this._pwinMouseY = 0;
-            // this._initEventListeners();
-        }
+    // Initialize properties
+    $.keysPressed = new Set();
+    $.keyIsPressed = false;
+    $.key = '';
+    $.keyCode = 0;
+    $.mouseButton = '';
+    $.mouseIsPressed = false;
+    $.movedX = 0;
+    $.movedY = 0;
+    $.mouseX = 0;
+    $.mouseY = 0;
+    $.pmouseX = 0;
+    $.pmouseY = 0;
+    $.winMouseX = 0;
+    $.winMouseY = 0;
+    $.pwinMouseX = 0;
+    $.pwinMouseY = 0;
 
-        _initEventListeners() {
-            if (!$.initEventListenersActive) {
-                $.initEventListenersActive = true
-                document.addEventListener('keydown', (e) => this._keyPressed(e));
-                document.addEventListener('keyup', (e) => this._keyReleased(e));
-                document.addEventListener('keypress', (e) => this._keyTyped(e));
-                document.addEventListener('mousemove', (e) => this._onmousemove(e));
-                document.addEventListener('mousedown', (e) => this._onmousedown(e));
-                document.addEventListener('mouseup', (e) => this._onmouseup(e));
-                document.addEventListener('click', (e) => this._onclick(e));
-                document.addEventListener('dblclick', (e) => this._doubleClicked(e));
-                document.addEventListener('wheel', (e) => this._mouseWheel(e));
+
+    // Define methods
+    $._keyPressed = function (e) {
+        $.keysPressed.add(e.keyCode);
+        $.keyIsPressed = true;
+        $.key = e.key;
+        $.keyCode = e.keyCode;
+
+        // Update global variables
+        globalScope.keyIsPressed = $.keyIsPressed;
+        globalScope.key = $.key;
+        globalScope.keyCode = $.keyCode;
+
+        if (typeof globalScope.keyPressed === 'function') {
+            globalScope.keyPressed(e);
+        }
+    };
+
+    $._keyReleased = function (e) {
+        $.keysPressed.delete(e.keyCode);
+        $.keyIsPressed = $.keysPressed.size > 0;
+        $.key = e.key;
+        $.keyCode = e.keyCode;
+
+        // Update global variables
+        globalScope.keyIsPressed = $.keyIsPressed;
+        globalScope.key = $.key;
+        globalScope.keyCode = $.keyCode;
+
+        if (typeof globalScope.keyReleased === 'function') {
+            globalScope.keyReleased(e);
+        }
+    };
+
+    $._keyTyped = function (e) {
+        if (typeof globalScope.keyTyped === 'function') {
+            globalScope.keyTyped(e);
+        }
+    };
+
+    $._onmousemove = function (e) {
+        $._updateMouse(e);
+        if ($.mouseIsPressed) {
+            if (typeof globalScope.mouseDragged === 'function') {
+                globalScope.mouseDragged(e);
+            }
+        } else {
+            if (typeof globalScope.mouseMoved === 'function') {
+                globalScope.mouseMoved(e);
             }
         }
+    };
 
-        _keyPressed(e) {
-            this.keysPressed.add(e.keyCode);
-            this.keyIsPressed = true;
-            this.key = e.key;
-            this.keyCode = e.keyCode;
-            if (typeof window.keyPressed === 'function') {
-                window.keyPressed(e);
-            }
+    $._onmousedown = function (e) {
+        $._updateMouse(e);
+        $.mouseIsPressed = true;
+        $.mouseButton = ['left', 'middle', 'right'][e.button];
+
+        // Update global variables
+        globalScope.mouseIsPressed = $.mouseIsPressed;
+        globalScope.mouseButton = $.mouseButton;
+
+        if (typeof globalScope.mousePressed === 'function') {
+            globalScope.mousePressed(e);
+        }
+    };
+
+    $._onmouseup = function (e) {
+        $._updateMouse(e);
+        $.mouseIsPressed = false;
+
+        // Update global variables
+        globalScope.mouseIsPressed = $.mouseIsPressed;
+
+        if (typeof globalScope.mouseReleased === 'function') {
+            globalScope.mouseReleased(e);
+        }
+    };
+
+    $._onclick = function (e) {
+        $._updateMouse(e);
+        $.mouseIsPressed = true;
+
+        // Update global variables
+        globalScope.mouseIsPressed = $.mouseIsPressed;
+
+        if (typeof globalScope.mouseClicked === 'function') {
+            globalScope.mouseClicked(e);
         }
 
-        _keyReleased(e) {
-            this.keysPressed.delete(e.keyCode);
-            this.keyIsPressed = this.keysPressed.size > 0;
-            this.key = e.key;
-            this.keyCode = e.keyCode;
+        $.mouseIsPressed = false;
+        globalScope.mouseIsPressed = $.mouseIsPressed;
+    };
 
-            if (typeof window.keyReleased === 'function') {
-                window.keyReleased(e);
-            }
+    $._doubleClicked = function (e) {
+        if (typeof globalScope.doubleClicked === 'function') {
+            globalScope.doubleClicked(e);
         }
+    };
 
-        _keyTyped(e) {
-            if (typeof window.keyTyped === 'function') {
-                window.keyTyped(e);
-            }
+    $._mouseWheel = function (e) {
+        if (typeof globalScope.mouseWheel === 'function') {
+            globalScope.mouseWheel(e);
         }
+    };
 
-        _onmousemove(e) {
-            this._updateMouse(e);
-            if (this.mouseIsPressed) {
-                if (typeof window.mouseDragged === 'function') {
-                    window.mouseDragged(e);
-                }
-            } else {
-                if (typeof window.mouseMoved === 'function') {
-                    window.mouseMoved(e);
-                }
-            }
+    $._calculateCanvasMetrics = function () {
+        if (!$) { return; }
+        const { canvas } = $;
+        if (!canvas) { return; }
+        const rect = canvas.getBoundingClientRect();
+        const aspectRatioCanvas = canvas.width / canvas.height;
+        const aspectRatioRect = rect.width / rect.height;
+
+        const isCanvasWider = aspectRatioCanvas > aspectRatioRect;
+        const displayedWidth = isCanvasWider ? rect.width : rect.height * aspectRatioCanvas;
+        const displayedHeight = isCanvasWider ? rect.width / aspectRatioCanvas : rect.height;
+
+        $.canvasMetrics = {
+            offsetX: (rect.width - displayedWidth) / 2,
+            offsetY: (rect.height - displayedHeight) / 2,
+            scaleX: canvas.width / displayedWidth,
+            scaleY: canvas.height / displayedHeight,
+            rect,
+            width: window.innerWidth,
+            height: window.innerHeight
+        };
+    };
+
+    $._updateMouse = function (e) {
+        if (e.changedTouches) return;
+
+        const { canvasMetrics } = $;
+        if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
+            $._calculateCanvasMetrics();
         }
+        if (!$.canvasMetrics) { return; }
+        const { offsetX, offsetY, scaleX, scaleY, rect } = $.canvasMetrics;
+        const scrollX = window.scrollX || window.pageXOffset;
+        const scrollY = window.scrollY || window.pageYOffset;
 
-        _onmousedown(e) {
-            this._updateMouse(e);
-            this.mouseIsPressed = true;
-            this.mouseButton = ['left', 'middle', 'right'][e.button];
-            if (typeof window.mousePressed === 'function') {
-                window.mousePressed(e);
-            }
+        // Update previous mouse positions
+        $.pmouseX = $.mouseX;
+        $.pmouseY = $.mouseY;
+        $.pwinMouseX = $.winMouseX;
+        $.pwinMouseY = $.winMouseY;
+
+        // Update current mouse positions
+        $.mouseX = $.scaleT5Mouse((e.clientX - rect.left - offsetX + scrollX) * scaleX);
+        $.mouseY = $.scaleT5Mouse((e.clientY - rect.top - offsetY + scrollY) * scaleY);
+        $.winMouseX = $.scaleT5Mouse(e.clientX + scrollX);
+        $.winMouseY = $.scaleT5Mouse(e.clientY + scrollY);
+
+        // Update global variables
+        globalScope.mouseX = $.mouseX;
+        globalScope.mouseY = $.mouseY;
+        globalScope.pmouseX = $.pmouseX;
+        globalScope.pmouseY = $.pmouseY;
+        globalScope.winMouseX = $.winMouseX;
+        globalScope.winMouseY = $.winMouseY;
+        globalScope.pwinMouseX = $.pwinMouseX;
+        globalScope.pwinMouseY = $.pwinMouseY;
+    };
+    // $._updateMouse = (e) => {
+    // 	if (e.changedTouches) return;
+    // 	if ($.canvas) {
+    // 		let rect = $.canvas.getBoundingClientRect();
+    // 		let sx = $.canvas.scrollWidth / $.width || 1;
+    // 		let sy = $.canvas.scrollHeight / $.height || 1;
+    // 		mouseX = (e.clientX - rect.left) / sx;
+    // 		mouseY = (e.clientY - rect.top) / sy;
+    // 	} else {
+    // 		mouseX = e.clientX;
+    // 		mouseY = e.clientY;
+    // 	}
+    // 	moveX = e.movementX;
+    // 	moveY = e.movementY;
+    // };
+    $.keyIsDown = function (keyCode) {
+        return $.keysPressed.has(keyCode);
+    };
+
+    $.requestPointerLock = function () {
+        if ($.canvas) {
+            $.canvas.requestPointerLock();
         }
+    };
 
-        _onmouseup(e) {
-            this._updateMouse(e);
-            this.mouseIsPressed = false;
-            if (typeof window.mouseReleased === 'function') {
-                window.mouseReleased(e);
-            }
+    $.exitPointerLock = function () {
+        document.exitPointerLock();
+    };
+
+    $.cursor = function (type = 'default', x = 0, y = 0) {
+        const canvas = $.canvas;
+        const types = {
+            ARROW: 'default',
+            CROSS: 'crosshair',
+            HAND: 'pointer',
+            MOVE: 'move',
+            TEXT: 'text',
+            WAIT: 'wait'
+        };
+
+        if (types[type]) {
+            canvas.style.cursor = types[type];
+        } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
+            canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
+        } else {
+            canvas.style.cursor = type;
         }
+    };
 
-        _onclick(e) {
-            this._updateMouse(e);
-            this.mouseIsPressed = true;
-            if (typeof window.mouseClicked === 'function') {
-                window.mouseClicked(e);
-            }
-            this.mouseIsPressed = false;
-        }
+    $.noCursor = function () {
+        const canvas = $.canvas;
+        canvas.style.cursor = 'none';
+    };
 
-        _doubleClicked(e) {
-            if (typeof window.doubleClicked === 'function') {
-                window.doubleClicked(e);
-            }
-        }
-
-        _mouseWheel(e) {
-            if (typeof window.mouseWheel === 'function') {
-                window.mouseWheel(e);
-            }
-        }
-
-        _calculateCanvasMetrics() {
-            if (!$) { return }
-            const { canvas } = $;
-            if (!canvas) { return }
-            const rect = canvas.getBoundingClientRect();
-            const aspectRatioCanvas = canvas.width / canvas.height;
-            const aspectRatioRect = rect.width / rect.height;
-
-            const isCanvasWider = aspectRatioCanvas > aspectRatioRect;
-            const displayedWidth = isCanvasWider ? rect.width : rect.height * aspectRatioCanvas;
-            const displayedHeight = isCanvasWider ? rect.width / aspectRatioCanvas : rect.height;
-
-            this.canvasMetrics = {
-                offsetX: (rect.width - displayedWidth) / 2,
-                offsetY: (rect.height - displayedHeight) / 2,
-                scaleX: canvas.width / displayedWidth,
-                scaleY: canvas.height / displayedHeight,
-                rect,
-                width: window.innerWidth,
-                height: window.innerHeight
-            };
-        }
-
-        _updateMouse(e) {
-            if (e.changedTouches) return;
-
-            const { canvasMetrics } = this;
-            if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
-                this._calculateCanvasMetrics();
-            }
-            if (!this.canvasMetrics) { return }
-            const { offsetX, offsetY, scaleX, scaleY, rect } = this.canvasMetrics;
-            const scrollX = window.scrollX || window.pageXOffset;
-            const scrollY = window.scrollY || window.pageYOffset;
-
-            this._pmouseX = this._mouseX;
-            this._pmouseY = this._mouseY;
-            this._mouseX = (e.clientX - rect.left - offsetX + scrollX) * scaleX;
-            this._mouseY = (e.clientY - rect.top - offsetY + scrollY) * scaleY;
-            this._pwinMouseX = this._winMouseX;
-            this._pwinMouseY = this._winMouseY;
-            this._winMouseX = e.clientX + scrollX;
-            this._winMouseY = e.clientY + scrollY;
-        }
-
-        keyIsDown(keyCode) {
-            return this.keysPressed.has(keyCode);
-        }
-
-        requestPointerLock() {
-            if ($.canvas) {
-                $.canvas.requestPointerLock();
-            }
-        }
-
-        exitPointerLock() {
-            document.exitPointerLock();
-        }
-
-        cursor(type = 'default', x = 0, y = 0) {
-            const canvas = $.canvas;
-            const types = {
-                ARROW: 'default',
-                CROSS: 'crosshair',
-                HAND: 'pointer',
-                MOVE: 'move',
-                TEXT: 'text',
-                WAIT: 'wait'
-            };
-
-            if (types[type]) {
-                canvas.style.cursor = types[type];
-            } else if (type.startsWith('url(') || /\.(cur|gif|jpg|jpeg|png)$/.test(type)) {
-                canvas.style.cursor = `url(${type}) ${x} ${y}, auto`;
-            } else {
-                canvas.style.cursor = type;
-            }
-        }
-
-        noCursor() {
-            const canvas = $.canvas;
-            canvas.style.cursor = 'none';
-        }
-
-        get mouseX() {
-            return $.scaleT5Mouse(this._mouseX);
-        }
-
-        get mouseY() {
-            return $.scaleT5Mouse(this._mouseY);
-        }
-
-        get pmouseX() {
-            return this._pmouseX;
-        }
-
-        get pmouseY() {
-            return this._pmouseY;
-        }
-
-        get winMouseX() {
-            return $.scaleT5Mouse(this._winMouseX);
-        }
-
-        get winMouseY() {
-            return $.scaleT5Mouse(this._winMouseY);
-        }
-
-        get pwinMouseX() {
-            return this._pwinMouseX;
-        }
-
-        get pwinMouseY() {
-            return this._pwinMouseY;
-        }
-
-    }
-
-    const t5Input = new T5Input();
-    t5Input._initEventListeners();
-
-    const properties = [
-        'mouseX', 'mouseY', 'pmouseX', 'pmouseY', 'winMouseX', 'winMouseY', 'pwinMouseX', 'pwinMouseY',
-        'mouseButton', 'mouseIsPressed'
-    ];
-
-    properties.forEach(prop => {
-        if (!(prop in window)) {
-            Object.defineProperty(window, prop, {
-                get: function () {
-                    return t5Input[prop];
-                }
-            });
-        }
-    });
-
-    if (!('keyIsPressed' in window)) {
-        Object.defineProperty(window, 'keyIsPressed', {
-            get: function () {
-                return t5Input.keyIsPressed;
-            }
-        });
-    }
-    if (!('key' in window)) {
-        Object.defineProperty(window, 'key', {
-            get: function () {
-                return t5Input.key;
-            }
-        });
-    }
-    if (!('keyCode' in window)) {
-        Object.defineProperty(window, 'keyCode', {
-            get: function () {
-                return t5Input.keyCode;
-            }
-        });
-    }
-    if (!('keyIsDown' in window)) {
-        globalScope.keyIsDown = (code) => t5Input.keyIsDown(code);
-    }
-    if (!('movedX' in window)) {
-        globalScope.movedX = () => t5Input.movedX;
-    }
-    if (!('movedY' in window)) {
-        globalScope.movedY = () => t5Input.movedY;
-    }
-    if (!('requestPointerLock' in window)) {
-        globalScope.requestPointerLock = () => t5Input.requestPointerLock();
-    }
-    if (!('exitPointerLock' in window)) {
-        globalScope.exitPointerLock = () => t5Input.exitPointerLock();
-    }
-    if (!('cursor' in window)) {
-        globalScope.cursor = (type, x, y) => t5Input.cursor(type, x, y);
-    }
-    if (!('noCursor' in window)) {
-        globalScope.noCursor = () => t5Input.noCursor();
-    }
-    
+    // Disable context menu on the canvas
     $.disableContextMenu = function () {
         if ($.canvas) {
             $.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
         }
+    };
+
+    $.initEventListeners = function () {
+        const canvas = $.canvas;
+        if (!canvas) {
+
+            return;
+        }
+
+        // Attach mouse event listeners to the canvas
+        window.addEventListener('mousemove', (e) => $._onmousemove(e));
+        canvas.addEventListener('mousedown', (e) => $._onmousedown(e));
+        canvas.addEventListener('mouseup', (e) => $._onmouseup(e));
+        canvas.addEventListener('click', (e) => $._onclick(e));
+        canvas.addEventListener('dblclick', (e) => $._doubleClicked(e));
+        canvas.addEventListener('wheel', (e) => $._mouseWheel(e));
+        canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable context menu
+
+        // Keyboard events are attached to the document
+        window.addEventListener('keydown', (e) => $._keyPressed(e));
+        window.addEventListener('keyup', (e) => $._keyReleased(e));
+        window.addEventListener('keypress', (e) => $._keyTyped(e));
+
+        // Recalculate canvas metrics on window resize
+        window.addEventListener('resize', () => {
+            $._calculateCanvasMetrics();
+        });
+
+        // Initial calculation of canvas metrics
+        $._calculateCanvasMetrics();
     }
+
+    // Start initializing event listeners
+
 };
 
 // Integrate the input add-on
 T5.addOns.input(T5.prototype, T5.prototype, window);
+
