@@ -15,6 +15,8 @@ T5.addOns.image = ($, p) => {
         }
     }
 
+    T5.Image = T5Image;
+
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
         const img = new Image();
@@ -59,37 +61,36 @@ T5.addOns.image = ($, p) => {
         return newImage;
     };
 
-    let tmpCanvas = null;
+    $._tmpCanvas = null;
 
-    function createTempCanvas(width, height) {
-        if (tmpCanvas != null) {
-            return tmpCanvas.tmpCtx;
+    $._createTempCanvas = function (width, height) {
+        if ($._tmpCanvas != null) {
+            return $._tmpCanvas.tmpCtx;
         } else {
-            tmpCanvas = document.createElement('canvas');
-            tmpCanvas.tmpCtx = tmpCanvas.getContext('2d');
-            tmpCanvas.width = width;
-            tmpCanvas.height = height;
-            return tmpCanvas.tmpCtx;
+            $._tmpCanvas = document.createElement('canvas');
+            $._tmpCanvas.tmpCtx = $._tmpCanvas.getContext('2d');
+            $._tmpCanvas.width = width;
+            $._tmpCanvas.height = height;
+            return $._tmpCanvas.tmpCtx;
         }
     }
 
-    function extractRGBFromColorString(colorString) {
+    $._extractRGBFromColorString = function (colorString) {
         const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
         return rgbaMatch ? `rgb(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]})` : colorString;
     }
 
-    function extractAlphaFromColorString(colorString) {
+    $._extractAlphaFromColorString = function (colorString) {
         const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
         return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
     }
 
     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
-
         let source;
         if (img instanceof T5Image) {
             source = img.img;
-        } else if (img instanceof $.Graphics) {
+        } else if (img instanceof $._Graphics) {
             source = img.canvas;
         } else if (img instanceof Image) {
             source = img;
@@ -123,14 +124,14 @@ T5.addOns.image = ($, p) => {
         [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
 
         if ($.currentTint) {
-            const tempCtx = createTempCanvas(sw, sh);
+            const tempCtx = $._createTempCanvas(sw, sh);
             tempCtx.clearRect(0, 0, sw, sh);
 
             tempCtx.globalCompositeOperation = 'source-over';
             tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
 
-            const tintRGB = extractRGBFromColorString($.currentTint);
-            const tintAlpha = extractAlphaFromColorString($.currentTint);
+            const tintRGB = $._extractRGBFromColorString($.currentTint);
+            const tintAlpha = $._extractAlphaFromColorString($.currentTint);
             tempCtx.globalCompositeOperation = 'multiply';
             tempCtx.fillStyle = tintRGB;
             tempCtx.fillRect(0, 0, sw, sh);
