@@ -91,7 +91,7 @@ T5.addOns.canvas = ($, p) => {
         }
 
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
-
+        $.initEventListeners();
         return new T5Element(p.canvas);
     };
 
@@ -303,8 +303,8 @@ T5.addOns.canvas = ($, p) => {
         $.dimensionUnit = dimensionUnit
         window.isFlexCanvas = true;
         if ($.renderer != 'graphics') {
-            window.width = $.dimensionUnit;
-            window.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
+            $.width = $.dimensionUnit;
+            $.height = ($.dimensionUnit / $.canvas.width) * $.canvas.height;
         }
     };
 
