@@ -45,7 +45,7 @@ T5.addOns.input = ($, p, globalScope) => {
 
 
     // Define methods
-    $._keyPressed = function (e) {
+    $._onkeydown = function (e) {
         $.keysPressed.add(e.keyCode);
         $.keyIsPressed = true;
         $.key = e.key;
@@ -61,7 +61,7 @@ T5.addOns.input = ($, p, globalScope) => {
         }
     };
 
-    $._keyReleased = function (e) {
+    $._onkeyup = function (e) {
         $.keysPressed.delete(e.keyCode);
         $.keyIsPressed = $.keysPressed.size > 0;
         $.key = e.key;
@@ -206,21 +206,7 @@ T5.addOns.input = ($, p, globalScope) => {
         globalScope.pwinMouseX = $.pwinMouseX;
         globalScope.pwinMouseY = $.pwinMouseY;
     };
-    // $._updateMouse = (e) => {
-    // 	if (e.changedTouches) return;
-    // 	if ($.canvas) {
-    // 		let rect = $.canvas.getBoundingClientRect();
-    // 		let sx = $.canvas.scrollWidth / $.width || 1;
-    // 		let sy = $.canvas.scrollHeight / $.height || 1;
-    // 		mouseX = (e.clientX - rect.left) / sx;
-    // 		mouseY = (e.clientY - rect.top) / sy;
-    // 	} else {
-    // 		mouseX = e.clientX;
-    // 		mouseY = e.clientY;
-    // 	}
-    // 	moveX = e.movementX;
-    // 	moveY = e.movementY;
-    // };
+
     $.keyIsDown = function (keyCode) {
         return $.keysPressed.has(keyCode);
     };
@@ -284,8 +270,8 @@ T5.addOns.input = ($, p, globalScope) => {
         canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable context menu
 
         // Keyboard events are attached to the document
-        window.addEventListener('keydown', (e) => $._keyPressed(e));
-        window.addEventListener('keyup', (e) => $._keyReleased(e));
+        window.addEventListener('keydown', (e) => $._onkeydown(e));
+        window.addEventListener('keyup', (e) => $._onkeyup(e));
         window.addEventListener('keypress', (e) => $._keyTyped(e));
 
         // Recalculate canvas metrics on window resize
@@ -296,11 +282,7 @@ T5.addOns.input = ($, p, globalScope) => {
         // Initial calculation of canvas metrics
         $._calculateCanvasMetrics();
     }
-
-    // Start initializing event listeners
-
 };
 
 // Integrate the input add-on
 T5.addOns.input(T5.prototype, T5.prototype, window);
-
