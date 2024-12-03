@@ -18,7 +18,7 @@ T5.addOns.createGraphics = ($, p) => {
         return p;
     };
 
-    $.Graphics = Graphics;
+    $._Graphics = Graphics;
 };
 
 T5.addOns.createGraphics(T5.prototype, T5.prototype);
