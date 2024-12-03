@@ -28,6 +28,8 @@ T5.addOns.colors = ($, p) => {
         }
     }
 
+    T5.Color = ColorRGBA;
+
     function parseColorString(colorStr) {
         let r, g, b, a = 255;
         if (colorStr.startsWith('#')) {
