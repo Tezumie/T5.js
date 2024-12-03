@@ -1,5 +1,5 @@
 //************************************************************************//
-//*******************************-T5Cenvas-*******************************//
+//*******************************-T5Canvas-*******************************//
 //************************************************************************//
 T5.addOns.canvas = ($, p) => {
     if (!$.t5PixelDensity) {
@@ -45,18 +45,22 @@ T5.addOns.canvas = ($, p) => {
     $.createCanvas = function (w, h, renderer, options) {
         if (typeof renderer == 'object') options = renderer;
         p.canvas = $.createElement('canvas').element;
-        $.canvas = p.canvas;
         p.canvas.width = (w || window.innerWidth) * $.t5PixelDensity;
         p.canvas.height = (h || window.innerHeight) * $.t5PixelDensity;
         p.canvas.style.width = `${w || window.innerWidth}px`;
         p.canvas.style.height = `${h || window.innerHeight}px`;
         $.width = w || window.innerWidth;
         $.height = h || window.innerHeight;
+        p.canvas.hw = p.canvas.width / 2;
+        p.canvas.hh = p.canvas.height / 2;
+        p.canvas.defaultWidth = p.canvas.width
+        p.canvas.defaultHeight = p.canvas.width
         p.context = p.canvas.getContext('2d');
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
-        $.renderer = renderer
+        $.renderer = renderer || '2d'
+        p.canvas.renderer = renderer || '2d'
         if (renderer != 'graphics') {
             window.drawingContext = p.context;
             window.width = $.width;
@@ -89,7 +93,7 @@ T5.addOns.canvas = ($, p) => {
                 configurable: true,
             });
         }
-
+        $.canvas = p.canvas;
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
         $.initEventListeners();
         return new T5Element(p.canvas);
@@ -112,6 +116,10 @@ T5.addOns.canvas = ($, p) => {
 
         p.canvas.width = w * $.t5PixelDensity;
         p.canvas.height = h * $.t5PixelDensity;
+        p.canvas.hw = p.canvas.width / 2;
+        p.canvas.hh = p.canvas.height / 2;
+        p.canvas.defaultWidth = p.canvas.width
+        p.canvas.defaultHeight = p.canvas.width
         p.canvas.style.width = `${w}px`;
         p.canvas.style.height = `${h}px`;
         $.width = w;
@@ -143,7 +151,7 @@ T5.addOns.canvas = ($, p) => {
             $.context.filter = prevProps.filter;
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
-
+        $.canvas = p.canvas
     };
 
     $.noCanvas = () => {
@@ -247,7 +255,7 @@ T5.addOns.canvas = ($, p) => {
         return angle;
     };
 
-    $.translate = function (x, y) {
+    $.translate = function (x, y = 0) {
         if ($.context) {
             $.context.translate(x, y);
         }
@@ -259,7 +267,7 @@ T5.addOns.canvas = ($, p) => {
         }
     };
 
-    $.scale = function (x, y) {
+    $.scale = function (x, y = x) {
         if ($.context) {
             $.context.scale(x, y);
         }
@@ -322,7 +330,7 @@ T5.addOns.canvas = ($, p) => {
         let source;
         sw = sw * $.t5PixelDensity
         sh = sh * $.t5PixelDensity
-        if (src instanceof $._Graphics) {
+        if (src instanceof $.Graphics) {
             source = src.canvas;
         } else if (src instanceof T5Element) {
             source = src.element;
