@@ -322,7 +322,7 @@ T5.addOns.canvas = ($, p) => {
         let source;
         sw = sw * $.t5PixelDensity
         sh = sh * $.t5PixelDensity
-        if (src instanceof $.Graphics) {
+        if (src instanceof $._Graphics) {
             source = src.canvas;
         } else if (src instanceof T5Element) {
             source = src.element;
