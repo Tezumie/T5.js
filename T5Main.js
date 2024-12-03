@@ -247,7 +247,7 @@ if (typeof window === 'object') {
     });
 }
 //************************************************************************//
-//*******************************-T5Cenvas-*******************************//
+//*******************************-T5Canvas-*******************************//
 //************************************************************************//
 T5.addOns.canvas = ($, p) => {
     if (!$.t5PixelDensity) {
@@ -293,18 +293,22 @@ T5.addOns.canvas = ($, p) => {
     $.createCanvas = function (w, h, renderer, options) {
         if (typeof renderer == 'object') options = renderer;
         p.canvas = $.createElement('canvas').element;
-        $.canvas = p.canvas;
         p.canvas.width = (w || window.innerWidth) * $.t5PixelDensity;
         p.canvas.height = (h || window.innerHeight) * $.t5PixelDensity;
         p.canvas.style.width = `${w || window.innerWidth}px`;
         p.canvas.style.height = `${h || window.innerHeight}px`;
         $.width = w || window.innerWidth;
         $.height = h || window.innerHeight;
+        p.canvas.hw = p.canvas.width / 2;
+        p.canvas.hh = p.canvas.height / 2;
+        p.canvas.defaultWidth = p.canvas.width
+        p.canvas.defaultHeight = p.canvas.width
         p.context = p.canvas.getContext('2d');
         p.canvas.ctx = p.context;
         p.canvas.context = p.context;
         document.body.appendChild(p.canvas);
-        $.renderer = renderer
+        $.renderer = renderer || '2d'
+        p.canvas.renderer = renderer || '2d'
         if (renderer != 'graphics') {
             window.drawingContext = p.context;
             window.width = $.width;
@@ -337,7 +341,7 @@ T5.addOns.canvas = ($, p) => {
                 configurable: true,
             });
         }
-
+        $.canvas = p.canvas;
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
         $.initEventListeners();
         return new T5Element(p.canvas);
@@ -360,6 +364,10 @@ T5.addOns.canvas = ($, p) => {
 
         p.canvas.width = w * $.t5PixelDensity;
         p.canvas.height = h * $.t5PixelDensity;
+        p.canvas.hw = p.canvas.width / 2;
+        p.canvas.hh = p.canvas.height / 2;
+        p.canvas.defaultWidth = p.canvas.width
+        p.canvas.defaultHeight = p.canvas.width
         p.canvas.style.width = `${w}px`;
         p.canvas.style.height = `${h}px`;
         $.width = w;
@@ -391,7 +399,7 @@ T5.addOns.canvas = ($, p) => {
             $.context.filter = prevProps.filter;
             $.context.imageSmoothingEnabled = prevProps.imageSmoothingEnabled;
         }
-
+        $.canvas = p.canvas
     };
 
     $.noCanvas = () => {
@@ -495,7 +503,7 @@ T5.addOns.canvas = ($, p) => {
         return angle;
     };
 
-    $.translate = function (x, y) {
+    $.translate = function (x, y = 0) {
         if ($.context) {
             $.context.translate(x, y);
         }
@@ -507,7 +515,7 @@ T5.addOns.canvas = ($, p) => {
         }
     };
 
-    $.scale = function (x, y) {
+    $.scale = function (x, y = x) {
         if ($.context) {
             $.context.scale(x, y);
         }
@@ -570,7 +578,7 @@ T5.addOns.canvas = ($, p) => {
         let source;
         sw = sw * $.t5PixelDensity
         sh = sh * $.t5PixelDensity
-        if (src instanceof $._Graphics) {
+        if (src instanceof $.Graphics) {
             source = src.canvas;
         } else if (src instanceof T5Element) {
             source = src.element;
@@ -865,23 +873,71 @@ T5.addOns.createGraphics = ($, p) => {
     class Graphics extends T5 {
         constructor(w, h, parent) {
             super('local', parent);
+            this.width = w;
+            this.height = h;
+            this.parent = parent;
+
+            // Create the off-screen canvas
+            this.createCanvas(w, h, 'graphics');
+            this.canvas.style.display = 'none';
+            this.pixelDensity(parent?.t5PixelDensity || 1);
+            this.flexibleCanvas(w);
+            // this.loadPixels()
+            // Store original parent methods for interaction
+            this.parentMethods = parent;
+        }
+
+        // Override the default `start` to avoid immediate draw loop
+        start() {
+            // Do not bind to global scope or start loop by default
+        }
+
+        // Reinitialize the draw loop for the graphics object if needed
+        beginDraw() {
+            this._isLooping = true;
+            this._shouldDrawOnce = true;
+            requestAnimationFrame(() => this._draw());
+        }
+
+        // Stop the draw loop for the graphics object
+        endDraw() {
+            this._isLooping = false;
         }
     }
 
     $.createGraphics = function (w, h) {
-        let p = new Graphics(w, h, $);
-        p.createCanvas(w, h, 'graphics')
-        p.canvas.style.display = 'none'
-        p.pixelDensity($.t5PixelDensity)
-        p.flexibleCanvas(w)
-
-        return p;
+        const graphicsInstance = new Graphics(w, h, $);
+        return graphicsInstance;
     };
 
     $._Graphics = Graphics;
 };
 
 T5.addOns.createGraphics(T5.prototype, T5.prototype);
+//************************************************************************//
+//******************************-T5Graphics-******************************//
+//************************************************************************//
+// T5.addOns.createGraphics = ($, p) => {
+//     class Graphics extends T5 {
+//         constructor(w, h, parent) {
+//             super('local', parent);
+//         }
+//     }
+
+//     $.createGraphics = function (w, h) {
+//         let p = new Graphics(w, h, $);
+//         p.createCanvas(w, h, 'graphics')
+//         p.canvas.style.display = 'none'
+//         p.pixelDensity($.t5PixelDensity)
+//         p.flexibleCanvas(w)
+
+//         return p;
+//     };
+
+//     $.Graphics = Graphics;
+// };
+
+// T5.addOns.createGraphics(T5.prototype, T5.prototype);
 //************************************************************************//
 //******************************-T5Colors-********************************//
 //************************************************************************//
@@ -1238,17 +1294,94 @@ T5.addOns.colors(T5.prototype, T5.prototype);
 //************************************************************************//
 //********************************-T5Image-*******************************//
 //************************************************************************//
+
+//WIP for compatability with p5 addons
+
 T5.addOns.image = ($, p) => {
     class T5Image {
-        constructor(img) {
-            this.img = img;
-            this.width = 0;
-            this.height = 0;
+        constructor(graphics) {
+            this.graphics = graphics;
+            this.pixels = [];
+            this.loading = false;
         }
 
-        setDimensions(width, height) {
-            this.width = width;
-            this.height = height;
+        get width() {
+            return this.graphics.width;
+        }
+
+        get height() {
+            return this.graphics.height;
+        }
+
+        get canvas() {
+            return this.graphics.canvas;
+        }
+
+        get drawingContext() {
+            return this.graphics.drawingContext;
+        }
+
+        get pixels() {
+            return this.graphics.pixels;
+        }
+
+        set pixels(value) {
+            this.graphics.pixels = value;
+        }
+
+        resize(width, height) {
+            this.graphics.resizeCanvas(width, height);
+        }
+
+        loadPixels() {
+            this.graphics.loadPixels();
+        }
+
+        updatePixels() {
+            this.graphics.updatePixels();
+        }
+
+        get(x, y, w, h) {
+            if (w !== undefined && h !== undefined) {
+                const subGraphics = this.graphics.get(x, y, w, h);
+                return new T5Image(subGraphics);
+            }
+            return this.graphics.get(x, y);
+        }
+
+        set(x, y, color) {
+            this.graphics.set(x, y, color);
+        }
+
+        copy(src, sx, sy, sw, sh, dx, dy, dw, dh) {
+            const source = src instanceof T5Image ? src.graphics : src;
+            this.graphics.copy(
+                source,
+                sx, sy, sw, sh,
+                dx, dy, dw, dh
+            );
+        }
+
+        mask(maskImage) {
+            const mask = maskImage instanceof T5Image ? maskImage.graphics : maskImage;
+            this.graphics.mask(mask);
+        }
+
+        filter(filterType, ...args) {
+            this.graphics.filter(filterType, ...args);
+        }
+
+        blend(src, sx, sy, sw, sh, dx, dy, dw, dh, mode) {
+            const source = src instanceof T5Image ? src.graphics : src;
+            this.graphics.blend(
+                source,
+                sx, sy, sw, sh,
+                dx, dy, dw, dh,
+                mode
+            );
+        }
+        save(fileName, extension) {
+            this.graphics.save(fileName, extension);
         }
     }
 
@@ -1256,46 +1389,45 @@ T5.addOns.image = ($, p) => {
 
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
+
         const img = new Image();
         img.crossOrigin = 'Anonymous';
 
+        const graphics = $.createGraphics(1, 1);
+        const t5Img = new T5Image(graphics);
+        t5Img.loading = true;
+
         img.onload = () => {
-            window.t5PreloadDone++;
-
-            const t5Img = new T5Image(img);
-            t5Img.setDimensions(img.width, img.height);
-
+            graphics.resizeCanvas(img.width, img.height);
+            graphics.drawingContext.drawImage(img, 0, 0);
+            t5Img.loading = false;
             if (callback) {
                 callback(t5Img);
             }
+            window.t5PreloadDone++;
         };
 
         img.onerror = (err) => {
             window.t5PreloadDone++;
             console.error(`Failed to load image at path: ${path}. Please check your image path.`);
+            if (callback) callback(null);
         };
 
         img.src = path;
-        return img;
+        return t5Img;
     };
 
     $.createImage = function (width, height, bgColor = null) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const context = canvas.getContext('2d');
+        const graphics = $.createGraphics(width, height);
+        const t5Img = new T5Image(graphics);
 
         if (bgColor) {
-            $.fill(bgColor)
-            context.fillRect(0, 0, width, height);
+            t5Img.fill(bgColor);
+            t5Img.noStroke();
+            t5Img.rect(0, 0, width, height);
         }
 
-        const newImage = new T5Image(canvas);
-        newImage.drawingContext = context
-        newImage.setDimensions(width, height);
-
-        return newImage;
+        return t5Img;
     };
 
     $._tmpCanvas = null;
@@ -1325,14 +1457,16 @@ T5.addOns.image = ($, p) => {
     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
         if (!img) return;
         let source;
-        if (img instanceof T5Image) {
-            source = img.img;
+        if (img instanceof T5.Image) {
+            source = img.canvas;
         } else if (img instanceof $._Graphics) {
             source = img.canvas;
         } else if (img instanceof Image) {
             source = img;
         } else if (img.img) {
             source = img.img;
+        } else if (img.canvas) {
+            source = img.canvas;
         } else {
             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
         }
@@ -1392,6 +1526,165 @@ T5.addOns.image = ($, p) => {
 };
 
 T5.addOns.image(T5.prototype, T5.prototype);
+
+
+// //************************************************************************//
+// //********************************-T5Image-*******************************//
+// //************************************************************************//
+// T5.addOns.image = ($, p) => {
+//     class T5Image {
+//         constructor(img) {
+//             this.img = img;
+//             this.width = 0;
+//             this.height = 0;
+//         }
+
+//         setDimensions(width, height) {
+//             this.width = width;
+//             this.height = height;
+//         }
+//     }
+
+//     T5.Image = T5Image;
+
+//     $.loadImage = function (path, callback) {
+//         window.t5PreloadCount++;
+//         const img = new Image();
+//         img.crossOrigin = 'Anonymous';
+
+//         img.onload = () => {
+//             window.t5PreloadDone++;
+
+//             const t5Img = new T5Image(img);
+//             t5Img.setDimensions(img.width, img.height);
+
+//             if (callback) {
+//                 callback(t5Img);
+//             }
+//         };
+
+//         img.onerror = (err) => {
+//             window.t5PreloadDone++;
+//             console.error(`Failed to load image at path: ${path}. Please check your image path.`);
+//         };
+
+//         img.src = path;
+//         return img;
+//     };
+
+//     $.createImage = function (width, height, bgColor = null) {
+//         const canvas = document.createElement('canvas');
+//         canvas.width = width;
+//         canvas.height = height;
+
+//         const context = canvas.getContext('2d');
+
+//         if (bgColor) {
+//             $.fill(bgColor)
+//             context.fillRect(0, 0, width, height);
+//         }
+
+//         const newImage = new T5Image(canvas);
+//         newImage.drawingContext = context
+//         newImage.setDimensions(width, height);
+
+//         return newImage;
+//     };
+
+//     $._tmpCanvas = null;
+
+//     $._createTempCanvas = function (width, height) {
+//         if ($._tmpCanvas != null) {
+//             return $._tmpCanvas.tmpCtx;
+//         } else {
+//             $._tmpCanvas = document.createElement('canvas');
+//             $._tmpCanvas.tmpCtx = $._tmpCanvas.getContext('2d');
+//             $._tmpCanvas.width = width;
+//             $._tmpCanvas.height = height;
+//             return $._tmpCanvas.tmpCtx;
+//         }
+//     }
+
+//     $._extractRGBFromColorString = function (colorString) {
+//         const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+//         return rgbaMatch ? `rgb(${rgbaMatch[1]}, ${rgbaMatch[2]}, ${rgbaMatch[3]})` : colorString;
+//     }
+
+//     $._extractAlphaFromColorString = function (colorString) {
+//         const rgbaMatch = colorString.match(/rgba\((\d+), (\d+), (\d+), ([\d.]+)\)/);
+//         return rgbaMatch ? parseFloat(rgbaMatch[4]) : 1;
+//     }
+
+//     $.image = function (img, x, y, w, h, sx = 0, sy = 0, sw, sh) {
+//         if (!img) return;
+//         let source;
+//         if (img instanceof T5Image) {
+//             source = img.img;
+//         } else if (img instanceof $._Graphics) {
+//             source = img.canvas;
+//         } else if (img instanceof Image) {
+//             source = img;
+//         } else if (img.img) {
+//             source = img.img;
+//         } else {
+//             throw new Error("Invalid image object. Ensure you're using 'loadImage(path)' to load images.");
+//         }
+
+//         w = w !== undefined ? w : source.width / $.t5PixelDensity;
+//         h = h !== undefined ? h : source.height / $.t5PixelDensity;
+
+//         sw = sw !== undefined ? sw : source.width / $.t5PixelDensity;
+//         sh = sh !== undefined ? sh : source.height / $.t5PixelDensity;
+//         sw *= $.t5PixelDensity
+//         sh *= $.t5PixelDensity
+
+//         switch ($.currentImageMode) {
+//             case 'corner':
+//                 break;
+//             case 'corners':
+//                 w = w - x;
+//                 h = h - y;
+//                 break;
+//             case 'center':
+//                 x = x - w / 2;
+//                 y = y - h / 2;
+//                 break;
+//         }
+
+//         [x, y, w, h] = $.scaleT5Coords([x, y, w, h]);
+
+//         if ($.currentTint) {
+//             const tempCtx = $._createTempCanvas(sw, sh);
+//             tempCtx.clearRect(0, 0, sw, sh);
+
+//             tempCtx.globalCompositeOperation = 'source-over';
+//             tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+
+//             const tintRGB = $._extractRGBFromColorString($.currentTint);
+//             const tintAlpha = $._extractAlphaFromColorString($.currentTint);
+//             tempCtx.globalCompositeOperation = 'multiply';
+//             tempCtx.fillStyle = tintRGB;
+//             tempCtx.fillRect(0, 0, sw, sh);
+
+//             tempCtx.globalCompositeOperation = 'destination-in';
+//             tempCtx.drawImage(source, sx, sy, sw, sh, 0, 0, sw, sh);
+
+//             $.context.save();
+//             $.context.globalAlpha = tintAlpha;
+//             $.context.drawImage(tempCtx.canvas, 0, 0, sw, sh, x, y, w, h);
+//             $.context.globalAlpha = 1;
+//             $.context.restore();
+//         } else {
+//             $.context.drawImage(source, sx, sy, sw, sh, x, y, w, h);
+//         }
+
+//         return img;
+//     };
+
+
+// };
+
+// T5.addOns.image(T5.prototype, T5.prototype);
 //************************************************************************//
 //********************************-T5Draw-********************************//
 //************************************************************************//
@@ -2442,173 +2735,173 @@ T5.addOns.math(T5.prototype, T5.prototype);
 //********************************-T5Text-********************************//
 //************************************************************************//
 T5.addOns.text = ($, p) => {
-    $.defineConstant('NORMAL', 'normal');
-    $.defineConstant('ITALIC', 'italic');
-    $.defineConstant('BOLD', 'bold');
-    $.defineConstant('BOLDITALIC', 'italic bold');
-    $.defineConstant('CENTER', 'center');
-    $.defineConstant('MIDDLE', 'middle');
-    $.defineConstant('LEFT', 'left');
-    $.defineConstant('RIGHT', 'right');
-    $.defineConstant('TOP', 'top');
-    $.defineConstant('BOTTOM', 'bottom');
-    $.defineConstant('BASELINE', 'alphabetic');
-    $.defineConstant('WORD', 'word');
-    $.defineConstant('CHAR', 'char');
-    $.defineConstant('WRAP', 'wrap');
-    $.defineConstant('NOWRAP', 'nowrap');
+  $.defineConstant('NORMAL', 'normal');
+  $.defineConstant('ITALIC', 'italic');
+  $.defineConstant('BOLD', 'bold');
+  $.defineConstant('BOLDITALIC', 'italic bold');
+  $.defineConstant('CENTER', 'center');
+  $.defineConstant('MIDDLE', 'middle');
+  $.defineConstant('LEFT', 'left');
+  $.defineConstant('RIGHT', 'right');
+  $.defineConstant('TOP', 'top');
+  $.defineConstant('BOTTOM', 'bottom');
+  $.defineConstant('BASELINE', 'alphabetic');
+  $.defineConstant('WORD', 'word');
+  $.defineConstant('CHAR', 'char');
+  $.defineConstant('WRAP', 'wrap');
+  $.defineConstant('NOWRAP', 'nowrap');
 
-    $.textSizeVal = 12;
-    $.textAlignH = 'left';
-    $.textAlignV = 'alphabetic';
-    $.textLeadingVal = $.textSizeVal * 1.2;
-    $.textFontVal = 'sans-serif';
-    $.textStyleVal = 'normal';
-    $.textWrapVal = 'wrap';
-    $.textFillColor = '#000000';
-    $.textStrokeColor = '#000000';
+  $.textSizeVal = 12;
+  $.textAlignH = 'left';
+  $.textAlignV = 'alphabetic';
+  $.textLeadingVal = $.textSizeVal * 1.2;
+  $.textFontVal = 'sans-serif';
+  $.textStyleVal = 'normal';
+  $.textWrapVal = 'wrap';
+  $.textFillColor = '#000000';
+  $.textStrokeColor = '#000000';
 
-    $.textSize = function (size) {
-        [size] = $.scaleT5Coords([size]);
-        if (size !== undefined) {
-            $.textSizeVal = size;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textSizeVal;
-    };
-
-    $.textFont = function (font) {
-        if (font instanceof T5Font) {
-            font = font.family;
-        }
-        if (font !== undefined) {
-            $.textFontVal = font;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textFontVal;
-    };
-
-    $.textStyle = function (style) {
-        if (style !== undefined) {
-            $.textStyleVal = style;
-            $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        }
-        return $.textStyleVal;
-    };
-
-    $.textAlign = function (hAlign, vAlign) {
-        if (hAlign !== undefined) {
-            $.textAlignH = hAlign;
-        }
-        if (vAlign !== undefined) {
-            if (vAlign == 'center') {
-                $.textAlignV = 'middle'
-            } else {
-                $.textAlignV = vAlign;
-            }
-        }
-        $.context.textAlign = $.textAlignH;
-        $.context.textBaseline = $.textAlignV;
-    };
-
-    $.textLeading = function (leading) {
-        [leading] = $.scaleT5Coords([leading]);
-        if (leading !== undefined) {
-            $.textLeadingVal = leading;
-        }
-        return $.textLeadingVal;
-    };
-
-    $.textWrap = function (wrapType) {
-        if (wrapType !== undefined) {
-            $.textWrapVal = wrapType;
-        }
-        return $.textWrapVal;
-    };
-
-    $.textWidth = function (str) {
-        return $.context.measureText(str).width;
-    };
-
-    $.textAscent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("M").actualBoundingBoxAscent;
-    };
-
-    $.textDescent = function () {
-        $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
-        return $.context.measureText("g").actualBoundingBoxDescent;
-    };
-
-    $.text = function (str, x, y, maxWidth) {
-        [x, y] = $.scaleT5Coords([x, y]);
-        const lines = str.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
-                $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
-            } else {
-                if ($.context.strokeStyle && !$.noAlphaStroke) {
-                    $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
-                }
-                if ($.context.fillStyle && !$.noAlphaFill) {
-                    $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
-                }
-            }
-        }
-    };
-
-    $.drawWrappedText = function (text, x, y, maxWidth) {
-        let words = text.split(' ');
-        let line = '';
-        for (let i = 0; i < words.length; i++) {
-            let testLine = line + words[i] + ' ';
-            let metrics = $.context.measureText(testLine);
-            let testWidth = metrics.width;
-            if (testWidth > maxWidth && i > 0) {
-                if ($.context.strokeStyle && !$.noAlphaStroke) {
-                    $.context.strokeText(line, x, y);
-                }
-                if ($.context.fillStyle && !$.noAlphaFill) {
-                    $.context.fillText(line, x, y);
-                }
-                line = words[i] + ' ';
-                y += $.textLeadingVal;
-            } else {
-                line = testLine;
-            }
-        }
-        if ($.context.strokeStyle) {
-            $.context.strokeText(line, x, y);
-        }
-        if ($.context.fillStyle) {
-            $.context.fillText(line, x, y);
-        }
-    };
-
-    class T5Font {
-        constructor(font, family) {
-            this.font = font;
-            this.family = family;
-        }
+  $.textSize = function (size) {
+    [size] = $.scaleT5Coords([size]);
+    if (size !== undefined) {
+      $.textSizeVal = size;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
     }
+    return $.textSizeVal;
+  };
 
-    $.loadFont = function (path, callback) {
-        window.t5PreloadCount++;
-        const family = 'CustomFont' + window.t5PreloadCount;
-        const font = new FontFace(family, `url(${path})`);
-        const t5Font = new T5Font(font, family);
-        font.load().then((loadedFont) => {
-            document.fonts.add(loadedFont);
-            window.t5PreloadDone++;
-            if (callback) {
-                callback(t5Font);
-            }
-        }).catch((error) => {
-            window.t5PreloadDone++;
-            console.error(`Failed to load font at path: ${path}. Error: ${error}`);
-        });
-        return t5Font;
-    };
+  $.textFont = function (font) {
+    if (font instanceof T5Font) {
+      font = font.family;
+    }
+    if (font !== undefined) {
+      $.textFontVal = font;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textFontVal;
+  };
+
+  $.textStyle = function (style) {
+    if (style !== undefined) {
+      $.textStyleVal = style;
+      $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    }
+    return $.textStyleVal;
+  };
+
+  $.textAlign = function (hAlign, vAlign) {
+    if (hAlign !== undefined) {
+      $.textAlignH = hAlign;
+    }
+    if (vAlign !== undefined) {
+      if (vAlign == 'center') {
+        $.textAlignV = 'middle'
+      } else {
+        $.textAlignV = vAlign;
+      }
+    }
+    $.context.textAlign = $.textAlignH;
+    $.context.textBaseline = $.textAlignV;
+  };
+
+  $.textLeading = function (leading) {
+    [leading] = $.scaleT5Coords([leading]);
+    if (leading !== undefined) {
+      $.textLeadingVal = leading;
+    }
+    return $.textLeadingVal;
+  };
+
+  $.textWrap = function (wrapType) {
+    if (wrapType !== undefined) {
+      $.textWrapVal = wrapType;
+    }
+    return $.textWrapVal;
+  };
+
+  $.textWidth = function (str) {
+    return $.context.measureText(str).width;
+  };
+
+  $.textAscent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("M").actualBoundingBoxAscent;
+  };
+
+  $.textDescent = function () {
+    $.context.font = `${$.textStyleVal} ${$.textSizeVal}px ${$.textFontVal}`;
+    return $.context.measureText("g").actualBoundingBoxDescent;
+  };
+
+  $.text = function (str, x, y, maxWidth) {
+    [x, y] = $.scaleT5Coords([x, y]);
+    const lines = str.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if ($.textWrapVal === 'wrap' && maxWidth !== undefined) {
+        $.drawWrappedText(lines[i], x, y + i * $.textLeadingVal, maxWidth);
+      } else {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
+          $.context.strokeText(lines[i], x, y + i * $.textLeadingVal);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(lines[i], x, y + i * $.textLeadingVal);
+        }
+      }
+    }
+  };
+
+  $.drawWrappedText = function (text, x, y, maxWidth) {
+    let words = text.split(' ');
+    let line = '';
+    for (let i = 0; i < words.length; i++) {
+      let testLine = line + words[i] + ' ';
+      let metrics = $.context.measureText(testLine);
+      let testWidth = metrics.width;
+      if (testWidth > maxWidth && i > 0) {
+        if ($.context.strokeStyle && !$.noAlphaStroke) {
+          $.context.strokeText(line, x, y);
+        }
+        if ($.context.fillStyle && !$.noAlphaFill) {
+          $.context.fillText(line, x, y);
+        }
+        line = words[i] + ' ';
+        y += $.textLeadingVal;
+      } else {
+        line = testLine;
+      }
+    }
+    if ($.context.strokeStyle) {
+      $.context.strokeText(line, x, y);
+    }
+    if ($.context.fillStyle) {
+      $.context.fillText(line, x, y);
+    }
+  };
+
+  class T5Font {
+    constructor(font, family) {
+      this.font = font;
+      this.family = family;
+    }
+  }
+
+  $.loadFont = function (path, callback) {
+    window.t5PreloadCount++;
+    const family = 'CustomFont' + window.t5PreloadCount;
+    const font = new FontFace(family, `url(${path})`);
+    const t5Font = new T5Font(font, family);
+    font.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+      window.t5PreloadDone++;
+      if (callback) {
+        callback(t5Font);
+      }
+    }).catch((error) => {
+      window.t5PreloadDone++;
+      console.error(`Failed to load font at path: ${path}. Error: ${error}`);
+    });
+    return t5Font;
+  };
 
 };
 
@@ -2814,7 +3107,7 @@ T5.addOns.vector = ($, p, globalScope) => {
             n.normalize();
             return this.sub(n.mult(2 * this.dot(n)));
         }
-
+        
         static reflect(v, n) {
             n = n.copy().normalize();
             return v.copy().sub(n.mult(2 * v.dot(n)));
@@ -3204,7 +3497,7 @@ T5.addOns.dom = ($, p, globalScope) => {
         };
     }
 
-
+  
 
     class T5Dom {
         constructor() {
@@ -3422,7 +3715,7 @@ T5.addOns.input = ($, p, globalScope) => {
 
 
     // Define methods
-    $._keyPressed = function (e) {
+    $._onkeydown = function (e) {
         $.keysPressed.add(e.keyCode);
         $.keyIsPressed = true;
         $.key = e.key;
@@ -3438,7 +3731,7 @@ T5.addOns.input = ($, p, globalScope) => {
         }
     };
 
-    $._keyReleased = function (e) {
+    $._onkeyup = function (e) {
         $.keysPressed.delete(e.keyCode);
         $.keyIsPressed = $.keysPressed.size > 0;
         $.key = e.key;
@@ -3583,21 +3876,7 @@ T5.addOns.input = ($, p, globalScope) => {
         globalScope.pwinMouseX = $.pwinMouseX;
         globalScope.pwinMouseY = $.pwinMouseY;
     };
-    // $._updateMouse = (e) => {
-    // 	if (e.changedTouches) return;
-    // 	if ($.canvas) {
-    // 		let rect = $.canvas.getBoundingClientRect();
-    // 		let sx = $.canvas.scrollWidth / $.width || 1;
-    // 		let sy = $.canvas.scrollHeight / $.height || 1;
-    // 		mouseX = (e.clientX - rect.left) / sx;
-    // 		mouseY = (e.clientY - rect.top) / sy;
-    // 	} else {
-    // 		mouseX = e.clientX;
-    // 		mouseY = e.clientY;
-    // 	}
-    // 	moveX = e.movementX;
-    // 	moveY = e.movementY;
-    // };
+
     $.keyIsDown = function (keyCode) {
         return $.keysPressed.has(keyCode);
     };
@@ -3661,8 +3940,8 @@ T5.addOns.input = ($, p, globalScope) => {
         canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable context menu
 
         // Keyboard events are attached to the document
-        window.addEventListener('keydown', (e) => $._keyPressed(e));
-        window.addEventListener('keyup', (e) => $._keyReleased(e));
+        window.addEventListener('keydown', (e) => $._onkeydown(e));
+        window.addEventListener('keyup', (e) => $._onkeyup(e));
         window.addEventListener('keypress', (e) => $._keyTyped(e));
 
         // Recalculate canvas metrics on window resize
@@ -3673,15 +3952,10 @@ T5.addOns.input = ($, p, globalScope) => {
         // Initial calculation of canvas metrics
         $._calculateCanvasMetrics();
     }
-
-    // Start initializing event listeners
-
 };
 
 // Integrate the input add-on
 T5.addOns.input(T5.prototype, T5.prototype, window);
-
-
 //************************************************************************//
 //*******************************-T5Sound-********************************//
 //************************************************************************//
