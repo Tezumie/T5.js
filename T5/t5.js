@@ -142,14 +142,14 @@ function T5(scope = 'global', parent) {
         }
         $._redraw = false;
     };
+    $._setupDone = false
 
-    $.start = () => {
+    $._start = () => {
+        $._setupDone = true
 
         if (typeof $.preload === 'function') {
-            // bindGlobals($)
             $.preload();
         }
-        // Check if preload function exists and if there are items to preload
         if (typeof $.preload !== 'function' || window.t5PreloadCount === window.t5PreloadDone) {
 
             if (typeof $.setup === 'function') $.setup();
@@ -180,16 +180,24 @@ function T5(scope = 'global', parent) {
         }
     };
 
+    document.addEventListener('DOMContentLoaded', $._start);
+
     if ($._globalSketch) {
         for (let method of ['setup', 'draw', 'preload', 'windowResized']) {
             if (window[method]) $[method] = window[method];
         }
         for (let key in $) {
-            if ($[key] instanceof Function) window[key] = $[key].bind($);
+            if (key[0] != '_' && typeof $[key] == 'function') {
+                window[key] = $[key].bind($);
+            } else if (key[0] != '_') {
+                window[key] = $[key];
+            }
         }
     }
 
-    document.addEventListener('DOMContentLoaded', $.start);
+    for (let m in T5.addOns) {
+        T5.addOns[m]($, proxy, globalScope);
+    }
 
     if (T5.methods.init) {
         for (let initMethod of T5.methods.init) {
@@ -199,16 +207,12 @@ function T5(scope = 'global', parent) {
         }
     }
 
-    for (let m in T5.addOns) {
-        T5.addOns[m]($, proxy, globalScope);
-    }
-
-    function bindGlobals($) {
+    if ($._globalSketch) {
         for (let key in $) {
-            if ($[key] instanceof Function) {
+            if (key[0] != '_' && typeof $[key] == 'function') {//&& key != 'createCanvas'
                 window[key] = $[key].bind($);
-            } else {
-                window[key] = $[key];  // Bind non-function properties too
+            } else if (key[0] != '_' && typeof $[key] != 'function' && !window[key]) {
+                window[key] = $[key];
             }
         }
     }
@@ -222,7 +226,6 @@ function T5(scope = 'global', parent) {
         });
 
     }
-
 }
 
 T5.addOns = {};
@@ -238,7 +241,7 @@ if (typeof window === 'object') {
             instance.draw = window.draw;
             instance.windowResized = window.windowResized;
             if (window.setup || window.draw) {
-                instance.start();
+                instance._start();
             }
         }
     });
