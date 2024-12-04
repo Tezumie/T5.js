@@ -176,9 +176,9 @@ T5.addOns.input = ($, p, globalScope) => {
         if (e.changedTouches) return;
 
         const { canvasMetrics } = $;
-        if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
+       // if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
             $._calculateCanvasMetrics();
-        }
+      //  }
         if (!$.canvasMetrics) { return; }
         const { offsetX, offsetY, scaleX, scaleY, rect } = $.canvasMetrics;
         const scrollX = window.scrollX || window.pageXOffset;
