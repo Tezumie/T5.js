@@ -92,7 +92,13 @@ T5.addOns.image = ($, p) => {
         }
     }
 
-    T5.Image = T5Image;
+    if ($._globalSketch) {
+        window.T5.Image = T5Image;
+        window.t5 = window.t5 || {};
+        window.t5.Image = T5Image;
+        window.p5 = window.p5 || {};
+        window.p5.Image = T5Image;
+    }
 
     $.loadImage = function (path, callback) {
         window.t5PreloadCount++;
