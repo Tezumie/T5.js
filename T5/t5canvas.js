@@ -95,7 +95,9 @@ T5.addOns.canvas = ($, p) => {
         }
         $.canvas = p.canvas;
         $.ctx.scale($.t5PixelDensity, $.t5PixelDensity);
-        $.initEventListeners();
+        if (renderer != 'graphics') {
+            $.initEventListeners();
+        }
         return new T5Element(p.canvas);
     };
 
