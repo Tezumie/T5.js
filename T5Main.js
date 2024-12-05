@@ -568,11 +568,18 @@ T5.addOns.canvas = ($, p) => {
 
     $.get = function (x, y, w, h) {
         if (x === undefined) {
-            return $.ctx.getImageData(0, 0, $.width, $.height);
+            const imgData = this.ctx.getImageData(0, 0, this.width, this.height);
+            const newGraphics = $.createGraphics(this.width, this.height);
+            newGraphics.ctx.putImageData(imgData, 0, 0);
+            return newGraphics;
         } else if (w === undefined) {
-            return $.ctx.getImageData(x, y, 1, 1).data;
+            const pixelData = this.ctx.getImageData(x, y, 1, 1).data;
+            return [pixelData[0], pixelData[1], pixelData[2], pixelData[3]];
         } else {
-            return $.ctx.getImageData(x, y, w, h);
+            const imgData = this.ctx.getImageData(x, y, w, h);
+            const newGraphics = $.createGraphics(w, h);
+            newGraphics.ctx.putImageData(imgData, 0, 0);
+            return newGraphics;
         }
     };
 
@@ -580,7 +587,7 @@ T5.addOns.canvas = ($, p) => {
         let source;
         sw = sw * $.t5PixelDensity
         sh = sh * $.t5PixelDensity
-        if (src instanceof $.Graphics) {
+        if (src instanceof $._Graphics) {
             source = src.canvas;
         } else if (src instanceof T5Element) {
             source = src.element;
