@@ -3945,7 +3945,6 @@ T5.addOns.input = ($, p, globalScope) => {
         canvas.addEventListener('click', (e) => $._onclick(e));
         canvas.addEventListener('dblclick', (e) => $._doubleClicked(e));
         canvas.addEventListener('wheel', (e) => $._mouseWheel(e));
-        canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // Disable context menu
 
         // Keyboard events are attached to the document
         window.addEventListener('keydown', (e) => $._onkeydown(e));
