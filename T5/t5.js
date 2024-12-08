@@ -46,7 +46,12 @@ function T5(scope = 'global', parent) {
             return true;
         }
     });
-
+    $._incrementPreload = function () {
+        window.t5PreloadCount++;
+    };
+    $._decrementPreload = function () {
+        window.t5PreloadCount--;
+    };
     $.frameCount = 0;
     $.deltaTime = 16;
     $._setFrameRate = 60;
@@ -54,19 +59,20 @@ function T5(scope = 'global', parent) {
     $._previousFrame = 0;
     $._isLooping = true;
     $._shouldDrawOnce = false;
-    let millisBegin = performance.now();
-    $.millis = () => performance.now() - millisBegin;
-    $._incrementPreload = function () {
-        window.t5PreloadCount++;
-    };
-    $._decrementPreload = function () {
-        window.t5PreloadCount--;
-    };
+    $._millisBegin = performance.now();
+    $._FRAME_RATE_ALPHA = 0.25;
+    $._FRAME_RATE_SAMPLES = 10;
+    $._frameRate = $._setFrameRate;
+    $._frameRateSamples = [];
+
+    $.millis = () => performance.now() - $._millisBegin;
 
     $.frameRate = (rate) => {
         if (rate !== undefined) {
             $._setFrameRate = rate;
             $._frameLength = 1000 / $._setFrameRate;
+            $._frameRate = rate;
+            $._frameRateSamples = [];
         } else {
             return $._frameRate;
         }
@@ -86,13 +92,23 @@ function T5(scope = 'global', parent) {
             return;
         }
         let timeSinceLast = now - $._previousFrame;
-        if (timeSinceLast < $._frameLength - 1) return;
+        if (timeSinceLast < $._frameLength - 1.25) return;
 
         $.deltaTime = now - $._previousFrame;
-        $._frameRate = 1000 / $.deltaTime;
+        const instantaneousFrameRate = 1000 / $.deltaTime;
+        $._frameRate = ($._FRAME_RATE_ALPHA * instantaneousFrameRate) + ((1 - $._FRAME_RATE_ALPHA) * $._frameRate);
+        $._frameRateSamples.push($._frameRate);
+        if ($._frameRateSamples.length > $._FRAME_RATE_SAMPLES) {
+            $._frameRateSamples.shift();
+        }
+
+        const rollingAverageFrameRate = $._frameRateSamples.reduce((a, b) => a + b, 0) / $._frameRateSamples.length;
+
         $.frameCount++;
         window.frameCount = $.frameCount;
         window.deltaTime = $.deltaTime;
+        $.smoothedFrameRate = rollingAverageFrameRate;
+
         if ($.context) $.context.save();
         if (typeof $.draw === 'function') $.draw();
         if ($.context) {
@@ -165,7 +181,7 @@ function T5(scope = 'global', parent) {
             const checkPreloadDone = setInterval(() => {
                 if (window.t5PreloadCount === window.t5PreloadDone) {
                     clearInterval(checkPreloadDone);
-                    millisBegin = performance.now();
+                    $._millisBegin = performance.now();
                     if (typeof $.setup === 'function') $.setup();
 
                     if ($.frameCount === 0 && $.context === null) $.createCanvas(100, 100);
