@@ -1,701 +1,1013 @@
-window.decomp = {
-    makeCCW: function (vertices) { return vertices; },
-    removeCollinearPoints: function (vertices) { return vertices; },
-    quickDecomp: function (vertices) { return [vertices]; },
-    isSimple: function () { return true; },
-    isConvex: function (vertices) { return true; }
-};
-
-T5.addOns.physics = ($, p, globalScope) => {
-    $.inverseScaleT5Coord = function (coord) {
-        if (!$.canvas) {
-            return;
-        }
-        if (!$.dimensionUnit) {
-            $.dimensionUnit = $.canvas.width / $.t5PixelDensity;
-        }
-        return (coord * $.dimensionUnit) / ($.canvas.width / $.t5PixelDensity);
-    };
-
-    $.inverseScaleT5Coords = function (coords) {
-        return coords.map(coord => $.inverseScaleT5Coord(coord));
-    };
-
-    const matterNotLoadedWarning = () => {
-        console.warn("Matter.js is not loaded. Please include Matter.js via CDN: https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js");
-    };
-
-    if (typeof Matter === 'undefined') {
-        // Define no-op functions that log a warning
-        const noOp = () => matterNotLoadedWarning();
-
-        $.PhysicsObject = noOp;
-        $.physicsEllipse = noOp;
-        $.physicsRect = noOp;
-        $.physicsPolygon = noOp;
-        $.physicsStar = noOp;
-        $.physicsBeginShape = noOp;
-        $.physicsVertex = noOp;
-        $.physicsEndShape = noOp;
-        $.worldGravity = noOp;
-        $.updatePhysics = noOp;
-
-        if ($._isGlobal) {
-            globalScope.PhysicsObject = noOp;
-            globalScope.physicsEllipse = noOp;
-            globalScope.physicsRect = noOp;
-            globalScope.physicsPolygon = noOp;
-            globalScope.physicsStar = noOp;
-            globalScope.physicsBeginShape = noOp;
-            globalScope.physicsVertex = noOp;
-            globalScope.physicsEndShape = noOp;
-            globalScope.worldGravity = noOp;
-            globalScope.updatePhysics = noOp;
-        }
-
-        return;
+T5.prototype.registerMethod("init", function () {
+    $ = this
+    if (typeof planck === "undefined") {
+        console.warn(
+            "Planck.js is not loaded. Ensure you include the library from: https://cdn.jsdelivr.net/npm/planck-js@latest/dist/planck.js"
+        )
+        return
+    }
+    const css = `
+    html,
+    body {
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background-color: rgb(12, 12, 12);
     }
 
-    if (typeof decomp !== 'undefined') {
-        Matter.Common.setDecomp(decomp);
+    canvas {
+        display: block;
+        max-width: 100%;
+        max-height: 100vh;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        /* image-rendering: pixelated;
+        font-smooth: never;
+        -webkit-font-smoothing: none; */
     }
 
-    const Engine = Matter.Engine,
-        Render = Matter.Render,
-        World = Matter.World,
-        Bodies = Matter.Bodies,
-        Body = Matter.Body,
-        Composite = Matter.Composite,
-        Events = Matter.Events,
-        Collision = Matter.Collision,
-        Constraint = Matter.Constraint;
+    :root {
+        --checkardPatternA: rgb(26, 27, 31);
+        --checkardPatternB: rgb(22, 23, 26);
+    }
 
-    // Create Matter.js engine and world
-    const engine = Engine.create();
-    const world = engine.world;
+    canvas {
+        background-color: var(--checkardPatternB);
+        background-image: linear-gradient(45deg, var(--checkardPatternA) 25%, transparent 25%, transparent 75%, var(--checkardPatternA) 75%, var(--checkardPatternA)), linear-gradient(45deg, var(--checkardPatternA) 25%, transparent 25%, transparent 75%, var(--checkardPatternA) 75%, var(--checkardPatternA));
+        background-size: 50px 50px;
+        background-position: 0 0, 25px 25px;
+    }
+    `;
 
-    $.physicsObjects = [];
+    const style = document.createElement('style');
+    style.textContent = css;
+    document.head.appendChild(style);
 
-    class PhysicsObject {
-        constructor(body, options = {}) {
-            this.body = body;
-            this.body.label = options.label || 'PhysicsObject';
-            this._fill = options.fill || 'rgba(255, 255, 255, 0.50)';
-            this._stroke = options.stroke || 'rgba(0, 0, 0, 1)';
-            this._static = options.isStatic || false;
-            this.debug = options.debug || false;
-            this.rotationEnabled = options.rotationEnabled !== undefined ? options.rotationEnabled : true;
-            World.add(world, this.body);
-            $.physicsObjects.push(this);
-            this.borderRadius = 0;
-            this.strokeWeight = 1;
-            this._maxSpeedX = Infinity;
-            this._maxSpeedY = Infinity;
-            if (this.body.label === 'rectangle') {
-                this.width = options.width;
-                this.height = options.height;
+    T5.prototype.world = new PhysicsWorld()
+    const _createCanvas = $.createCanvas
+    this.createCanvas = function (w, h) {
+        world.canvas = _createCanvas.call($, w * world.scale, h * world.scale)
+        this.resizeRender(w, h)
+        return world.canvas
+    }
+    const _pixelDensity = $.pixelDensity
+    this.pixelDensity = function (value) {
+        _pixelDensity.call($, value)
+        if ($.width) {
+            this.resizeRender(width, height)
+        }
+    }
+    this.resizeRender = function (w, h) {
+        let windowAspect = windowWidth / windowHeight
+        let canvasAspect = w / h
+        if (canvasAspect > windowAspect) {
+            world.canvas.style("width", "100vw")
+            world.canvas.style("height", "auto")
+        } else {
+            world.canvas.style("width", "auto")
+            world.canvas.style("height", "100vh")
+        }
+    }
+    $.strokeWeight(0.25)
+})
+
+T5.prototype.registerMethod("pre", function () {
+    $ = this
+
+    world.step()
+})
+
+T5.prototype.registerMethod("post", function () {
+    world.camera.update()
+    world.camera.render(() => {
+        if (world._gridEnabled) {
+            $._drawBackgroundGrid(world._gridEnabled)
+        }
+        world.bodies.forEach((body) => body.draw())
+        world.drawDebug()
+    })
+    if (typeof postProcess === "function") postProcess()
+})
+
+class PhysicsWorld {
+    constructor() {
+        this.world = planck.World(planck.Vec2(0, 10))
+        // Enable sleeping to reduce CPU usage
+        this.world.setAllowSleeping(true)
+        this.world._gridEnabled = false
+        // Reduce iterations for performance gain
+        this.velocityIterations = 6
+        this.positionIterations = 2
+        // Optional: Disable continuous physics if not needed
+        this.world.setContinuousPhysics(true)
+        this.bodies = []
+        this.groups = {}
+        this.camera = new Camera(this)
+        this._collisionCallbacks = []
+        this.scale = 1
+        // Reduce cull distances to limit physics and render load
+        this.renderCullDistance = max(windowWidth, windowHeight)
+        this.physicsCullDistance = max(windowWidth, windowHeight)
+
+        this.timeStep = 1 / 60
+        this.activeCollisions = new Set() // Tracks active collisions
+        this._collisionCallbacks = []
+        this.debugTargets = [] // List of objects to debug
+    }
+
+    get x() {
+        let x = -width / 2
+        let y = -height / 2
+        let worldCoords = toScreenCoordinates({ x, y }, this)
+        return worldCoords.x
+    }
+
+    get y() {
+        let x = -width / 2
+        let y = -height / 2
+        let worldCoords = toScreenCoordinates({ x, y }, this)
+        return worldCoords.y
+    }
+
+    get width() {
+        let x1 = -width / 2 - this.renderCullDistance
+        let y1 = -height / 2
+        let x2 = width / 2 + this.renderCullDistance
+        let y2 = -height / 2
+
+        let worldCoord1 = toScreenCoordinates({ x: x1, y: y1 }, this)
+        let worldCoord2 = toScreenCoordinates({ x: x2, y: y2 }, this)
+
+        return Math.abs(worldCoord2.x - worldCoord1.x)
+    }
+
+    get height() {
+        let x1 = -width / 2
+        let y1 = -height / 2 - this.renderCullDistance
+        let x2 = -width / 2
+        let y2 = height / 2 + this.renderCullDistance
+
+        let worldCoord1 = toScreenCoordinates({ x: x1, y: y1 }, this)
+        let worldCoord2 = toScreenCoordinates({ x: x2, y: y2 }, this)
+
+        return Math.abs(worldCoord2.y - worldCoord1.y)
+    }
+    debug(...targets) {
+        // If the first argument is an array (like world.bodies), spread it
+        if (targets.length === 1 && Array.isArray(targets[0])) {
+            targets = [...targets[0]]
+        }
+
+        // If the first argument is a PhysicsGroup, add its bodies
+        if (targets.length === 1 && targets[0] instanceof PhysicsGroup) {
+            targets = [...targets[0].bodies]
+        }
+
+        for (let target of targets) {
+            if (target instanceof Body && !this.debugTargets.includes(target)) {
+                this.debugTargets.push(target)
+            } else if (target instanceof PhysicsGroup) {
+                target.bodies.forEach((body) => {
+                    if (!this.debugTargets.includes(body)) {
+                        this.debugTargets.push(body)
+                    }
+                })
             }
-            this.x = $.inverseScaleT5Coord(this.pos.x);
-            this.y = $.inverseScaleT5Coord(this.pos.y);
-        }
-
-        moveTo(targetX, targetY, followStrength = 0.1) {
-            const scaledTargetX = $.scaleT5Coord(targetX);
-            const scaledTargetY = $.scaleT5Coord(targetY);
-
-            const dx = scaledTargetX - this.body.position.x;
-            const dy = scaledTargetY - this.body.position.y;
-
-            const velocityX = dx * followStrength;
-            const velocityY = dy * followStrength;
-
-            Body.setVelocity(this.body, { x: velocityX, y: velocityY });
-        }
-
-        setPosition(x, y) {
-            const scaledX = $.scaleT5Coord(x);
-            const scaledY = $.scaleT5Coord(y);
-            Body.setPosition(this.body, { x: scaledX, y: scaledY });
-        }
-
-        applyForce(force) {
-            Body.applyForce(this.body, this.body.position, force);
-            this._applySpeedLimits();
-        }
-
-        _applySpeedLimits() {
-            const velocity = this.body.velocity;
-            const newVelocity = {
-                x: Math.sign(velocity.x) * Math.min(Math.abs(velocity.x), this._maxSpeedX),
-                y: Math.sign(velocity.y) * Math.min(Math.abs(velocity.y), this._maxSpeedY)
-            };
-            Body.setVelocity(this.body, newVelocity);
-        }
-
-        collidesWith(otherBody) {
-            return Collision.collides(this.body, otherBody.body);
-        }
-
-        remove() {
-            World.remove(world, this.body);
-            const index = $.physicsObjects.indexOf(this);
-            if (index !== -1) {
-                $.physicsObjects.splice(index, 1);
-            }
-        }
-
-        get pos() {
-            return this.body.position;
-        }
-
-        set pos(newPos) {
-            Body.setPosition(this.body, newPos);
-        }
-
-        get angle() {
-            return this.body.angle;
-        }
-
-        set angle(newAngle) {
-            if (this.rotationEnabled) {
-                Body.setAngle(this.body, newAngle);
-            }
-        }
-
-        get static() {
-            return this._static;
-        }
-
-        set static(isStatic) {
-            this._static = isStatic;
-            Body.setStatic(this.body, isStatic);
-        }
-
-        get fill() {
-            return this._fill;
-        }
-
-        set fill(color) {
-            this._fill = color.toString();
-        }
-
-        get stroke() {
-            return this._stroke;
-        }
-
-        set stroke(color) {
-            this._stroke = color.toString();
-        }
-
-        get velocity() {
-            return this.body.velocity;
-        }
-
-        set velocity(newVelocity) {
-            Body.setVelocity(this.body, {
-                x: Math.sign(newVelocity.x) * Math.min(Math.abs(newVelocity.x), this._maxSpeedX),
-                y: Math.sign(newVelocity.y) * Math.min(Math.abs(newVelocity.y), this._maxSpeedY)
-            });
-        }
-
-        get density() {
-            return this.body.density;
-        }
-
-        set density(newDensity) {
-            Body.setDensity(this.body, newDensity);
-        }
-
-        get mass() {
-            return this.body.mass;
-        }
-
-        set mass(newMass) {
-            Body.setMass(this.body, newMass);
-        }
-
-        get friction() {
-            return this.body.friction;
-        }
-
-        set friction(newFriction) {
-            this.body.friction = newFriction;
-        }
-
-        get frictionAir() {
-            return this.body.frictionAir;
-        }
-
-        set frictionAir(newFrictionAir) {
-            this.body.frictionAir = newFrictionAir;
-        }
-
-        get restitution() {
-            return this.body.restitution;
-        }
-
-        set restitution(newRestitution) {
-            this.body.restitution = newRestitution;
-        }
-
-        get gravityScale() {
-            return this.body.gravityScale;
-        }
-
-        set gravityScale(newGravityScale) {
-            this.body.gravityScale = newGravityScale;
-        }
-
-        get speed() {
-            const that = this;
-            return {
-                get x() {
-                    return that.body.velocity.x;
-                },
-                set x(value) {
-                    that.body.velocity.x = Math.sign(value) * Math.min(Math.abs(value), that._maxSpeedX);
-                },
-                get y() {
-                    return that.body.velocity.y;
-                },
-                set y(value) {
-                    that.body.velocity.y = Math.sign(value) * Math.min(Math.abs(value), that._maxSpeedY);
-                }
-            };
-        }
-
-        get maxSpeed() {
-            const that = this;
-            return {
-                get x() {
-                    return that._maxSpeedX;
-                },
-                set x(value) {
-                    that._maxSpeedX = value;
-                },
-                get y() {
-                    return that._maxSpeedY;
-                },
-                set y(value) {
-                    that._maxSpeedY = value;
-                }
-            };
-        }
-
-        update() {
-            this.pos = this.body.position;
-            this.x = $.inverseScaleT5Coord(this.pos.x);
-            this.y = $.inverseScaleT5Coord(this.pos.y);
-            if (!this.rotationEnabled) {
-                Body.setAngle(this.body, 0); // Prevent rotation by setting angle to 0
-            }
-            this._applySpeedLimits();
-        }
-
-        display() {
-            $.push();
-            $.translate(this.pos.x, this.pos.y);
-            $.fill(this.fill);
-            $.stroke(this.stroke);
-            $.strokeWeight(this.strokeWeight);
-            $.borderRadius(this.borderRadius);
-            if (this.body.label === 'ellipse') {
-                $.rotate(this.angle);
-                $.ellipse(0, 0, $.inverseScaleT5Coord(this.body.circleRadius * 2));
-                if (this.debug) {
-                    $.line(0, 0, 0, -$.inverseScaleT5Coord(this.body.circleRadius));
-                }
-            } else if (this.body.label === 'rectangle') {
-                $.rotate(this.angle);
-                $.rectMode($.CENTER);
-                $.rect(0, 0, $.inverseScaleT5Coord(this.width), $.inverseScaleT5Coord(this.height));
-                if (this.debug) {
-                    $.line(0, 0, 0, -$.inverseScaleT5Coord(this.height / 2));
-                }
-            } else if (this.body.label === 'fromVertices') {
-                $.beginShape();
-                this.body.vertices.forEach((vertex, index) => {
-                    $.vertex($.inverseScaleT5Coord(vertex.x - this.pos.x), $.inverseScaleT5Coord(vertex.y - this.pos.y));
-                });
-                $.endShape($.CLOSE);
-
-                if (this.debug) {
-                    const firstVertex = this.body.vertices[0];
-                    $.line(0, 0, $.inverseScaleT5Coord(firstVertex.x - this.pos.x), $.inverseScaleT5Coord(firstVertex.y - this.pos.y));
-                }
-
-            }
-            $.pop();
         }
     }
 
-    class PhysicsGroup {
-        constructor() {
-            this.objects = [];
-            return new Proxy(this, {
-                get: (target, prop) => {
-                    if (typeof prop === 'string' && !isNaN(prop)) {
-                        return target.objects[prop];
-                    } else if (prop in target) {
-                        return target[prop];
+    stopDebug(...targets) {
+        if (targets.length === 0 || (targets.length === 1 && Array.isArray(targets[0]))) {
+            this.debugTargets = []
+            return
+        }
+
+        for (let target of targets) {
+            if (target instanceof Body) {
+                const index = this.debugTargets.indexOf(target)
+                if (index !== -1) {
+                    this.debugTargets.splice(index, 1)
+                }
+            } else if (target instanceof PhysicsGroup) {
+                target.bodies.forEach((body) => {
+                    const index = this.debugTargets.indexOf(body)
+                    if (index !== -1) {
+                        this.debugTargets.splice(index, 1)
+                    }
+                })
+            }
+        }
+    }
+
+    // Clear all debug targets
+    clearDebug() {
+        this.debugTargets = []
+    }
+
+    // Draw debug information
+    drawDebug() {
+        for (let target of this.debugTargets) {
+            if (target instanceof Body) {
+                target.debug()
+            } else if (target instanceof PhysicsGroup) {
+                target.bodies.forEach((body) => body.debug())
+            }
+        }
+    }
+
+    set gravity(g) {
+        this.world.setGravity(planck.Vec2(g.x, g.y))
+    }
+
+    get gravity() {
+        const g = this.world.getGravity()
+        return { x: g.x, y: g.y }
+    }
+
+    step() {
+        this.cullPhysics()
+        this.world.step(this.timeStep, this.velocityIterations, this.positionIterations)
+        for (let i = 0, len = this.bodies.length; i < len; i++) {
+            this.bodies[i].update()
+        }
+    }
+
+    addBody(body) {
+        this.bodies.push(body)
+    }
+
+    onCollision(callback) {
+        this._collisionCallbacks.push(callback)
+        this.world.on("begin-contact", (contact) => {
+            const a = contact.getFixtureA().getBody().body
+            const b = contact.getFixtureB().getBody().body
+            if (a && b) {
+                for (let cb of this._collisionCallbacks) {
+                    cb(a, b)
+                }
+
+                if (typeof a.onCollision === "function") a.onCollision(b)
+                if (typeof b.onCollision === "function") b.onCollision(a)
+            }
+        })
+    }
+
+    isColliding(callback) {
+        const checkedPairs = new Set()
+        for (let i = 0; i < this.bodies.length; i++) {
+            const bodyA = this.bodies[i]
+            const fixA = bodyA.body.getFixtureList()
+            const aabbAABB = fixA.getAABB(0)
+            const aabbA = {
+                minX: aabbAABB.lowerBound.x,
+                maxX: aabbAABB.upperBound.x,
+                minY: aabbAABB.lowerBound.y,
+                maxY: aabbAABB.upperBound.y,
+            }
+
+            for (let j = i + 1; j < this.bodies.length; j++) {
+                const bodyB = this.bodies[j]
+                const fixB = bodyB.body.getFixtureList()
+                const aabbBABB = fixB.getAABB(0)
+                const aabbB = {
+                    minX: aabbBABB.lowerBound.x,
+                    maxX: aabbBABB.upperBound.x,
+                    minY: aabbBABB.lowerBound.y,
+                    maxY: aabbBABB.upperBound.y,
+                }
+
+                if (!this._aabbOverlap(aabbA, aabbB)) continue
+                const pairKey = `${i}-${j}`
+                if (!checkedPairs.has(pairKey) && this._areBodiesColliding(bodyA, bodyB)) {
+                    checkedPairs.add(pairKey)
+                    callback(bodyA, bodyB)
+                }
+            }
+        }
+    }
+
+    _aabbOverlap(a, b) {
+        return a.minX <= b.maxX && a.maxX >= b.minX && a.minY <= b.maxY && a.maxY >= b.minY
+    }
+
+    _areBodiesColliding(bodyA, bodyB) {
+        if (!bodyA.body || !bodyB.body) return false
+
+        let contactList = bodyA.body.getContactList()
+        while (contactList) {
+            const contact = contactList.contact
+            if (contact.isTouching()) {
+                const fixtureA = contact.getFixtureA()
+                const fixtureB = contact.getFixtureB()
+
+                // Check if the bodies match
+                if (
+                    (fixtureA.getBody() === bodyA.body && fixtureB.getBody() === bodyB.body) ||
+                    (fixtureA.getBody() === bodyB.body && fixtureB.getBody() === bodyA.body)
+                ) {
+                    return true
+                }
+            }
+            contactList = contactList.next
+        }
+
+        return false
+    }
+
+    destroyBody(targetBody) {
+        if (!targetBody || !targetBody.body) return
+
+        // Remove from debugTargets if present
+        const debugIndex = this.debugTargets.indexOf(targetBody)
+        if (debugIndex !== -1) {
+            this.debugTargets.splice(debugIndex, 1)
+        }
+
+        // Destroy the body in the physics world
+        this.world.destroyBody(targetBody.body)
+
+        // Remove from world.bodies
+        const index = this.bodies.indexOf(targetBody)
+        if (index >= 0) {
+            this.bodies.splice(index, 1)
+        }
+    }
+
+    // Physics culling: remove bodies beyond physicsCullDistance
+    cullPhysics() {
+        const cameraCenter = this.camera.getWorldCenter()
+        for (let i = this.bodies.length - 1; i >= 0; i--) {
+            const b = this.bodies[i]
+            const pos = b.position
+            const dx = pos.x - cameraCenter.x
+            const dy = pos.y - cameraCenter.y
+            const dist = Math.sqrt(dx * dx + dy * dy)
+
+            if (dist > this.physicsCullDistance) {
+                // Remove body if too far
+                this.destroyBody(b)
+            }
+        }
+    }
+}
+
+function toWorldCoordinates(screenCoords, world) {
+    const zoom = world.camera.zoom
+    // No inversion of y-axis here, y increases downwards in both screen and world
+    return {
+        x: (screenCoords.x - width / 2) / (world.scale * zoom) + world.camera.x / world.scale,
+        y: (screenCoords.y - height / 2) / (world.scale * zoom) + world.camera.y / world.scale,
+    }
+}
+
+function toScreenCoordinates(worldCoords, world) {
+    const zoom = world.camera.zoom
+    return {
+        x: (worldCoords.x * world.scale - world.camera.x) * zoom + width / 2,
+        y: (worldCoords.y * world.scale - world.camera.y) * zoom + height / 2,
+    }
+}
+
+class Body {
+    constructor(x, y, w, h, options = {}) {
+        if (typeof h === "object") {
+            options = h
+            h = w
+        }
+
+        let physicsWorld = world
+        this.width = w || 1
+        this.height = h || 1
+        this.id = options.id || null
+        this.fill = options.fill || "#14151f"
+        this.type = options.type || "dynamic" // 'static', 'dynamic', 'kinematic'
+        this.shapeType = options.shape || "rect" // 'rect', 'ellipse', 'polygon'
+        this.sides = options.sides || 5
+        this.radius = options.radius || Math.min(w, h) / 2
+        this.stroke = options.stroke || "#bababa"
+        this.strokeWeight = options.strokeWeight || 0.25
+        this.borderRadius = options.borderRadius || 0
+        this.friction = options.friction || 0.3
+        this.restitution = options.restitution || 0.5
+        this.density = options.density || 1.0
+        this.group = options.group || null
+        this.joints = []
+
+        const worldCoords = toWorldCoordinates({ x, y }, world)
+
+        const bodyDef = {
+            type: this.type,
+            position: planck.Vec2(worldCoords.x, worldCoords.y),
+            allowSleep: true,
+            ...options,
+        }
+
+        this.body = physicsWorld.world.createBody(bodyDef)
+        this.body.body = this
+
+        this.addFixture()
+
+        for (const [key, value] of Object.entries(options)) {
+            if (!(key in this)) {
+                this[key] = value
+            }
+        }
+
+        this.world = physicsWorld
+        this.world.addBody(this)
+
+        if (this.group) {
+            this.group.bodies.push(this)
+        }
+    }
+
+    addFixture() {
+        let shape
+        switch (this.shapeType) {
+            case "rect":
+                shape = planck.Box(this.width / 2, this.height / 2)
+                break
+            case "ellipse":
+                shape = planck.Circle(this.radius)
+                break
+            case "polygon":
+                shape = planck.Polygon(this.generatePolygonVertices(this.radius, this.sides))
+                break
+            default:
+                console.warn("Unsupported shape type; defaulting to rectangle.")
+                shape = planck.Box(this.width / 2, this.height / 2)
+        }
+
+        this.body.createFixture({
+            shape,
+            density: this.density,
+            friction: this.friction,
+            restitution: this.restitution,
+        })
+    }
+
+    generatePolygonVertices(radius, sides) {
+        const angleOffset = -Math.PI / 2
+        const angleIncrement = (2 * Math.PI) / sides
+        const vertices = []
+        for (let i = 0; i < sides; i++) {
+            const angle = i * angleIncrement + angleOffset
+            const x = Math.cos(angle) * radius
+            const y = Math.sin(angle) * radius
+            vertices.push(planck.Vec2(x, y))
+        }
+        return vertices
+    }
+
+    addJoint(joint) {
+        this.joints.push(joint)
+    }
+
+    removeJoint(joint) {
+        const index = this.joints.indexOf(joint)
+        if (index !== -1) {
+            this.joints.splice(index, 1)
+        }
+    }
+    get position() {
+        const position = this.body.getPosition()
+        let x = position.x
+        let y = position.y
+        let worldCoords = toScreenCoordinates({ x, y }, this.world)
+        return { x: worldCoords.x, y: worldCoords.y }
+    }
+    get worldPosition() {
+        const worldPos = this.body.getPosition()
+        return { x: worldPos.x, y: worldPos.y }
+    }
+
+    set position(screenPos) {
+        const worldPos = toWorldCoordinates(screenPos, this.world)
+        this.body.setTransform(planck.Vec2(worldPos.x, worldPos.y), this.body.getAngle())
+    }
+
+    moveTo(x, y) {
+        this.position = toScreenCoordinates({ x, y })
+    }
+
+    get vel() {
+        const velocity = this.body.getLinearVelocity()
+        return { x: velocity.x, y: velocity.y } // Velocity stays in world space
+    }
+
+    set vel(velocity) {
+        this.body.setLinearVelocity(planck.Vec2(velocity.x, velocity.y))
+    }
+
+    setVelocity(velocity) {
+        if (this.type === "dynamic" && this.body) {
+            this.body.setLinearVelocity(planck.Vec2(velocity.x, velocity.y))
+        }
+    }
+
+    getVelocity() {
+        if (this.body) {
+            const v = this.body.getLinearVelocity()
+            return { x: v.x, y: v.y }
+        }
+        return { x: 0, y: 0 }
+    }
+
+    get rotation() {
+        return this.body.getAngle()
+    }
+
+    set rotation(angle) {
+        const pos = this.body.getPosition()
+        this.body.setTransform(pos, angle)
+    }
+
+    get mass() {
+        return this.body.getMass()
+    }
+
+    set mass(value) {
+        const area = this.width * this.height || Math.PI * this.radius ** 2
+        this.density = value / area
+        this.body.getFixtureList().setDensity(this.density)
+        this.body.resetMassData()
+    }
+
+    applyForce(force) {
+        if (this.type === "dynamic" && this.body) {
+            this.body.applyForceToCenter(planck.Vec2(force.x, force.y))
+        }
+    }
+
+    applyImpulse(impulse) {
+        if (this.type === "dynamic" && this.body) {
+            this.body.applyLinearImpulse(planck.Vec2(impulse.x, impulse.y), this.body.getWorldCenter())
+        }
+    }
+
+    _checkContactWith(otherBody) {
+        let contactList = this.body.getContactList()
+        while (contactList) {
+            const contact = contactList.contact
+            if (
+                contact.isTouching() &&
+                (contact.getFixtureA().getBody() === otherBody.body ||
+                    contact.getFixtureB().getBody() === otherBody.body)
+            ) {
+                return true
+            }
+            contactList = contactList.next
+        }
+        return false
+    }
+
+    isColliding(otherBody) {
+        return this._checkContactWith(otherBody)
+    }
+
+    collides(otherBody) {
+        return this.isColliding(otherBody)
+    }
+
+    isGrounded(...groundRefs) {
+        const groundBodies = this._flattenGroundRefs(groundRefs)
+        let contactList = this.body.getContactList()
+        while (contactList) {
+            const contact = contactList.contact
+            if (contact.isTouching()) {
+                const bodyA = contact.getFixtureA().getBody().body
+                const bodyB = contact.getFixtureB().getBody().body
+                const otherBody = bodyA === this ? bodyB : bodyA
+
+                if (groundBodies.includes(otherBody)) {
+                    return true
+                }
+            }
+            contactList = contactList.next
+        }
+        return false
+    }
+
+    _flattenGroundRefs(groundRefs) {
+        const result = []
+        for (let ref of groundRefs) {
+            if (ref instanceof PhysicsGroup) {
+                result.push(...ref.bodies)
+            } else if (Array.isArray(ref)) {
+                for (let item of ref) {
+                    if (item instanceof PhysicsGroup) {
+                        result.push(...item.bodies)
                     } else {
-                        return undefined;
+                        result.push(item)
                     }
                 }
-            });
-        }
-
-        add(object) {
-            this.objects.push(object);
-        }
-
-        remove(object) {
-            object.remove();
-            const index = this.objects.indexOf(object);
-            if (index !== -1) {
-                this.objects.splice(index, 1);
+            } else {
+                result.push(ref)
             }
         }
-
-        checkCollisions(target) {
-            for (let object of this.objects) {
-                if (object.collidesWith(target)) {
-                    return object;
-                }
-            }
-            return null;
-        }
-
-        update() {
-            for (let object of this.objects) {
-                object.update();
-                object.display();
-            }
-        }
-
-        get length() {
-            return this.objects.length;
-        }
+        return result
     }
-    class Camera {
-        constructor(target, offsetX = 0, offsetY = 0) {
-            this.target = target;
-            this.offsetX = offsetX;
-            this.offsetY = offsetY;
-        }
 
-        apply() {
-            $.translate(-this.target.pos.x + this.offsetX, -this.target.pos.y + this.offsetY);
+    destroy() {
+        if (this.world && this.body) {
+            this.joints.forEach((joint) => this.world.world.destroyJoint(joint))
+            this.world.world.destroyBody(this.body)
+            const idx = this.world.bodies.indexOf(this)
+            if (idx >= 0) this.world.bodies.splice(idx, 1)
         }
     }
 
-    function scaleOptions(options = {}) {
-        const scaledOptions = { ...options };
-        if (scaledOptions.stiffness !== undefined) {
-            scaledOptions.stiffness = $.scaleT5Coord(scaledOptions.stiffness);
-        }
-        if (scaledOptions.damping !== undefined) {
-            scaledOptions.damping = $.scaleT5Coord(scaledOptions.damping);
-        }
-        if (scaledOptions.restitution !== undefined) {
-            scaledOptions.restitution = $.scaleT5Coord(scaledOptions.restitution);
-        }
-        if (scaledOptions.length !== undefined) {
-            scaledOptions.length = $.scaleT5Coord(scaledOptions.length);
-        }
-        if (scaledOptions.mass !== undefined) {
-            scaledOptions.mass = $.scaleT5Coord(scaledOptions.mass);
-        }
-        if (scaledOptions.vertices !== undefined && Array.isArray(scaledOptions.vertices)) {
-            scaledOptions.vertices = scaledOptions.vertices.map(vertex => {
-                return { x: $.scaleT5Coord(vertex.x), y: $.scaleT5Coord(vertex.y) };
-            });
-        }
-        return scaledOptions;
+    update() {
+        // Per-frame logic if needed
     }
 
-    function physicsEllipse(x, y, radius, options = {}) {
-        [x, y, radius] = $.scaleT5Coords([x, y, radius]);
-        radius /= 2;
-        const scaledOptions = scaleOptions(options);
-        const body = Bodies.circle(x, y, radius, scaledOptions);
-        return new PhysicsObject(body, { ...scaledOptions, label: 'ellipse' });
-    }
-
-    function physicsRect(x, y, width, height, options = {}) {
-        [x, y, width, height] = $.scaleT5Coords([x, y, width, height]);
-        const scaledOptions = scaleOptions(options);
-        const body = Bodies.rectangle(x, y, width, height, scaledOptions);
-        return new PhysicsObject(body, { ...scaledOptions, label: 'rectangle', width, height });
-    }
-
-    function physicsPolygon(x, y, radius, verts, options = {}) {
-        [x, y, radius] = $.scaleT5Coords([x, y, radius]);
-        const angleOffset = -Math.PI / 2;
-        const angleIncrement = (2 * Math.PI) / verts;
-        const vertices = [];
-        for (let i = 0; i < verts; i++) {
-            const angle = i * angleIncrement + angleOffset;
-            const vx = x + Math.cos(angle) * radius;
-            const vy = y + Math.sin(angle) * radius;
-            vertices.push({ x: vx, y: vy });
-        }
-        const scaledOptions = scaleOptions(options);
-        const body = Bodies.fromVertices(x, y, [vertices], scaledOptions, true);
-        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
-    }
-
-    function physicsStar(x, y, radius1, radius2, points, options = {}) {
-        [x, y, radius1, radius2] = $.scaleT5Coords([x, y, radius1, radius2]);
-        const angleOffset = -Math.PI / 2;
-        const angleIncrement = (2 * Math.PI) / points;
-        const vertices = [];
-        for (let i = 0; i < points * 2; i++) {
-            const angle = i * angleIncrement / 2 + angleOffset;
-            const radius = (i % 2 === 0) ? radius1 : radius2;
-            const vx = x + Math.cos(angle) * radius;
-            const vy = y + Math.sin(angle) * radius;
-            vertices.push({ x: vx, y: vy });
-        }
-        const scaledOptions = scaleOptions(options);
-        const body = Bodies.fromVertices(x, y, [vertices], scaledOptions, true);
-        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
-    }
-
-    let vertices = [];
-
-    function physicsBeginShape() {
-        vertices = [];
-    }
-
-    function physicsVertex(x, y) {
-        [x, y] = $.scaleT5Coords([x, y]);
-        vertices.push({ x, y });
-    }
-
-    function physicsEndShape(options = {}) {
-        const scaledOptions = scaleOptions(options);
-        const body = Bodies.fromVertices(vertices[0].x, vertices[0].y, [vertices], scaledOptions, true);
-        return new PhysicsObject(body, { ...scaledOptions, label: 'fromVertices' });
-    }
-
-    $.physicsConstraints = [];
-
-    class PhysicsConstraint {
-        constructor(constraint, options = {}) {
-            this.constraint = constraint;
-            this._stroke = options.stroke || 'rgba(0, 0, 0, 1)';
-            this._fill = options.fill || 'rgba(255, 255, 255, 0.50)';
-            this._borderRadius = options.borderRadius || 0;
-            this._strokeWeight = options.strokeWeight || 1;
-            this._width = options.width || 1;
-            $.physicsConstraints.push(this);
+    draw() {
+        // Render culling check
+        const camCenter = this.world.camera.getWorldCenter()
+        const pos = this.position
+        const dx = pos.x - camCenter.x
+        const dy = pos.y - camCenter.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist > this.world.renderCullDistance) {
+            // Skip drawing if outside render cull distance
+            return
         }
 
-        display() {
-            const pointA = this.constraint.bodyA.position;
-            const pointB = this.constraint.pointB;
-            const distance = dist(pointA.x, pointA.y, pointB.x, pointB.y);
-            const angle = atan2(pointB.y - pointA.y, pointB.x - pointA.x);
-            let w = (this.width)
-            $.push();
-            $.translate(pointA.x, pointA.y);
-            $.rotate(angle);
-            $.borderRadius(this._borderRadius);
-            $.rectMode($.CORNER);
-            $.stroke(this._stroke);
-            $.strokeWeight(this._strokeWeight);
-            $.fill(this._fill);
-            $.rect(0, -w / 2, $.inverseScaleT5Coord(distance), w);
-            $.pop();
-        }
+        if (!this.body) return
+        const position = this.body.getPosition()
+        const angle = this.body.getAngle()
 
-        get pointA() {
-            const that = this;
-            return {
-                get x() {
-                    return $.inverseScaleT5Coord(that.constraint.bodyA.position.x);
-                },
-                set x(value) {
-                    Body.setPosition(that.constraint.bodyA, { x: $.scaleT5Coord(value), y: that.constraint.bodyA.position.y });
-                },
-                get y() {
-                    return $.inverseScaleT5Coord(that.constraint.bodyA.position.y);
-                },
-                set y(value) {
-                    Body.setPosition(that.constraint.bodyA, { x: that.constraint.bodyA.position.x, y: $.scaleT5Coord(value) });
-                }
-            };
-        }
-
-        get pointB() {
-            const that = this;
-            return {
-                get x() {
-                    return $.inverseScaleT5Coord(that.constraint.pointB.x);
-                },
-                set x(value) {
-                    that.constraint.pointB.x = $.scaleT5Coord(value);
-                },
-                get y() {
-                    return $.inverseScaleT5Coord(that.constraint.pointB.y);
-                },
-                set y(value) {
-                    that.constraint.pointB.y = $.scaleT5Coord(value);
-                }
-            };
-        }
-
-        set stroke(value) {
-            this._stroke = value.toString();
-        }
-
-        get stroke() {
-            return this._stroke;
-        }
-
-        set fill(value) {
-            this._fill = value.toString();
-        }
-
-        get fill() {
-            return this._fill;
-        }
-
-        set borderRadius(value) {
-            this._borderRadius = value;
-        }
-
-        get borderRadius() {
-            return this._borderRadius;
-        }
-
-        set strokeWeight(value) {
-            this._strokeWeight = $.scaleT5Coord(value);
-        }
-
-        get strokeWeight() {
-            return $.inverseScaleT5Coord(this._strokeWeight);
-        }
-
-        set width(value) {
-            this._width = $.scaleT5Coord(value);
-        }
-
-        get width() {
-            return $.inverseScaleT5Coord(this._width);
-        }
-
-        set length(value) {
-            this.constraint.length = $.scaleT5Coord(value);
-        }
-
-        get length() {
-            return $.inverseScaleT5Coord(this.constraint.length);
-        }
-
-        set stiffness(value) {
-            this.constraint.stiffness = value;
-        }
-
-        get stiffness() {
-            return this.constraint.stiffness;
-        }
-
-        set damping(value) {
-            this.constraint.damping = value;
-        }
-
-        get damping() {
-            return this.constraint.damping;
-        }
-    }
-
-
-    function createConstraint(bodyA, pointB, options = {}) {
-        [pointB.x, pointB.y] = $.scaleT5Coords([pointB.x, pointB.y]);
-
-        const scaledOptions = scaleOptions(options);
-        const constraint = Constraint.create({
-            bodyA: bodyA,
-            pointB: pointB,
-            ...scaledOptions
-        });
-
-        World.add(world, constraint);
-        const physicsConstraint = new PhysicsConstraint(constraint, options);
-
-        return new Proxy(physicsConstraint, {
-            get(target, prop) {
-                if (prop in target) {
-                    return target[prop];
-                } else if (prop in target.constraint) {
-                    return target.constraint[prop];
-                } else {
-                    return undefined;
-                }
-            },
-            set(target, prop, value) {
-                if (prop in target) {
-                    target[prop] = value;
-                } else if (prop in target.constraint) {
-                    target.constraint[prop] = value;
-                } else {
-                    return false;
-                }
-                return true;
-            }
-        });
-    }
-
-    $.PhysicsObject = PhysicsObject;
-    $.PhysicsGroup = PhysicsGroup;
-    $.Camera = Camera;
-    $.physicsEllipse = physicsEllipse;
-    $.physicsRect = physicsRect;
-    $.physicsPolygon = physicsPolygon;
-    $.physicsStar = physicsStar;
-    $.physicsBeginShape = physicsBeginShape;
-    $.physicsVertex = physicsVertex;
-    $.physicsEndShape = physicsEndShape;
-    $.createConstraint = createConstraint;
-
-    $.worldGravity = function (g) {
-        engine.world.gravity.y = $.scaleT5Coord(g);
-    };
-
-    $.updatePhysics = function () {
-        Engine.update(engine);
-        for (let obj of $.physicsObjects) {
-            obj.update();
-            obj.display();
-        }
-        for (let constraint of $.physicsConstraints) {
-            constraint.display();
-        }
-        if ($._globalSketch) {
-            window.physicsObjects = $.physicsObjects;
+        push()
+        translate(position.x * this.world.scale, position.y * this.world.scale)
+        rotate(angle)
+        if (this.stroke) {
+            stroke(this.stroke)
+            strokeWeight(this.strokeWeight)
         } else {
-            p.physicsObjects = $.physicsObjects;
+            noStroke()
         }
-    };
-
-    if ($._globalSketch) {
-        globalScope.PhysicsObject = PhysicsObject;
-        globalScope.PhysicsGroup = PhysicsGroup;
-        globalScope.Camera = Camera;
-        globalScope.physicsEllipse = physicsEllipse;
-        globalScope.physicsRect = physicsRect;
-        globalScope.physicsPolygon = physicsPolygon;
-        globalScope.physicsStar = physicsStar;
-        globalScope.physicsBeginShape = physicsBeginShape;
-        globalScope.physicsVertex = physicsVertex;
-        globalScope.physicsEndShape = physicsEndShape;
-        globalScope.createConstraint = createConstraint;
-        globalScope.worldGravity = $.worldGravity;
-        globalScope.updatePhysics = $.updatePhysics;
+        fill(this.fill)
+        rectMode(CENTER)
+        borderRadius(this.borderRadius * this.world.scale)
+        switch (this.shapeType) {
+            case "rect":
+                rect(0, 0, this.width * this.world.scale, this.height * this.world.scale)
+                break
+            case "ellipse":
+                ellipse(0, 0, this.radius * 2 * this.world.scale, this.radius * 2 * this.world.scale)
+                break
+            case "polygon":
+                polygon(0, 0, this.radius * this.world.scale, this.sides)
+                break
+        }
+        pop()
     }
-};
 
-// Integrate the physics add-on
-T5.addOns.physics(T5.prototype, T5.prototype, window);
+    debug() {
+        const fixture = this.body.getFixtureList()
+        if (!fixture) {
+            console.warn(`Debug Error: Body with ID "${this.id}" has no fixtures.`)
+            return // Exit early to prevent errors
+        }
+
+        const aabb = fixture.getAABB(0)
+        if (!aabb) {
+            console.warn(`Debug Error: Fixture for body with ID "${this.id}" has no AABB.`)
+            return // Exit early to prevent errors
+        }
+
+        const pos1 = aabb.lowerBound
+        const pos2 = aabb.upperBound
+
+        rectMode(CORNER)
+        noFill()
+        stroke("#ff0022")
+        strokeWeight(this.strokeWeight)
+
+        rect(
+            pos1.x * this.world.scale,
+            pos1.y * this.world.scale,
+            (pos2.x - pos1.x) * this.world.scale,
+            (pos2.y - pos1.y) * this.world.scale
+        )
+    }
+}
+class Joint {
+    constructor(type, bodyA, bodyB, options = {}) {
+        if (!planck[type]) {
+            throw new Error(`Unsupported joint type: ${type}`)
+        }
+
+        this.type = type
+        this.bodyA = bodyA
+        this.bodyB = bodyB
+
+        // Clone options to avoid mutation
+        let jointOptions = { ...options }
+
+        // Convert anchor points to planck.Vec2 if they exist
+        if (jointOptions.anchor) {
+            jointOptions.anchor = planck.Vec2(jointOptions.anchor.x, jointOptions.anchor.y)
+        }
+        if (jointOptions.anchorA) {
+            jointOptions.anchorA = planck.Vec2(jointOptions.anchorA.x, jointOptions.anchorA.y)
+        }
+        if (jointOptions.anchorB) {
+            jointOptions.anchorB = planck.Vec2(jointOptions.anchorB.x, jointOptions.anchorB.y)
+        }
+        if (jointOptions.axis) {
+            jointOptions.axis = planck.Vec2(jointOptions.axis.x, jointOptions.axis.y)
+        }
+
+        // Create the joint definition based on joint type
+        let jointDef
+        switch (type) {
+            case "RevoluteJoint":
+                jointDef = {
+                    bodyA: bodyA.body,
+                    bodyB: bodyB.body,
+                    anchor: jointOptions.anchor || bodyA.worldPosition,
+                    ...jointOptions,
+                }
+                break
+            case "DistanceJoint":
+                jointDef = {
+                    bodyA: bodyA.body,
+                    bodyB: bodyB.body,
+                    anchorA: jointOptions.anchorA || bodyA.worldPosition,
+                    anchorB: jointOptions.anchorB || bodyB.worldPosition,
+                    length: jointOptions.length || bodyA.body.getPosition().distance(bodyB.body.getPosition()),
+                    frequencyHz: jointOptions.frequencyHz || 0,
+                    dampingRatio: jointOptions.dampingRatio || 0,
+                    ...jointOptions,
+                }
+                break
+            case "PrismaticJoint":
+                jointDef = {
+                    bodyA: bodyA.body,
+                    bodyB: bodyB.body,
+                    anchor: jointOptions.anchor || bodyA.worldPosition,
+                    axis: jointOptions.axis || planck.Vec2(1, 0),
+                    ...jointOptions,
+                }
+                break
+            // Add cases for other joint types as needed
+            default:
+                jointDef = {
+                    bodyA: bodyA.body,
+                    bodyB: bodyB.body,
+                    ...jointOptions,
+                }
+        }
+
+        // Instantiate the joint in the world
+        this.joint = world.world.createJoint(new planck[type](jointDef))
+
+        // Add the joint to the bodies for tracking
+        bodyA.addJoint(this)
+        bodyB.addJoint(this)
+    }
+
+    destroy() {
+        if (this.joint) {
+            world.world.destroyJoint(this.joint)
+            this.joint = null
+
+            // Remove from associated bodies
+            this.bodyA.removeJoint(this)
+            this.bodyB.removeJoint(this)
+        }
+    }
+
+    getReactionForce(inv_dt) {
+        return this.joint.getReactionForce(inv_dt)
+    }
+
+    getReactionTorque(inv_dt) {
+        return this.joint.getReactionTorque(inv_dt)
+    }
+
+    setMotorSpeed(speed) {
+        if (this.joint.setMotorSpeed) {
+            this.joint.setMotorSpeed(speed)
+        } else {
+            console.warn(`${this.type} does not support motor speed`)
+        }
+    }
+
+    setMaxMotorTorque(torque) {
+        if (this.joint.setMaxMotorTorque) {
+            this.joint.setMaxMotorTorque(torque)
+        } else {
+            console.warn(`${this.type} does not support max motor torque`)
+        }
+    }
+
+    enableMotor(flag) {
+        if (this.joint.enableMotor) {
+            this.joint.enableMotor(flag)
+        } else {
+            console.warn(`${this.type} does not support motor`)
+        }
+    }
+
+    debug() {
+        let screenA, screenB
+        switch (this.type) {
+            case "RevoluteJoint":
+                const anchor = this.joint.getAnchorA()
+                screenA = toScreenCoordinates({ x: anchor.x, y: anchor.y }, world)
+                screenB = screenA // RevoluteJoint has a single anchor point
+                break
+            case "DistanceJoint":
+                const anchorA = this.joint.getAnchorA()
+                const anchorB = this.joint.getAnchorB()
+                screenA = toScreenCoordinates({ x: anchorA.x, y: anchorA.y }, world)
+                screenB = toScreenCoordinates({ x: anchorB.x, y: anchorB.y }, world)
+                break
+            // Add cases for other joint types as needed
+            default:
+                const anchorC = this.joint.getAnchorA()
+                const anchorD = this.joint.getAnchorB()
+                screenA = toScreenCoordinates({ x: anchorC.x, y: anchorC.y }, world)
+                screenB = toScreenCoordinates({ x: anchorD.x, y: anchorD.y }, world)
+                break
+        }
+
+        push()
+        stroke(255, 0, 0)
+        strokeWeight(0.5)
+        line(screenA.x, screenA.y, screenB.x, screenB.y)
+        pop()
+    }
+}
+
+class Camera {
+    constructor(physicsWorld) {
+        this.world = physicsWorld
+        this.x = 0
+        this.y = 0
+        this.zoom = 1
+        this.target = null
+        this.lag = 1
+        this.offsetX = 0
+        this.offsetY = 0
+    }
+
+    follow(body, offsetX = 0, offsetY = 0) {
+        this.target = body
+        this.offsetX = offsetX
+        this.offsetY = offsetY
+    }
+
+    update() {
+        if (this.target && this.target.body) {
+            const pos = this.target.body.getPosition()
+            const targetX = pos.x * this.world.scale + this.offsetX
+            const targetY = pos.y * this.world.scale + this.offsetY
+            this.x = lerp(this.x, targetX, this.lag)
+            this.y = lerp(this.y, targetY, this.lag)
+        }
+    }
+
+    getWorldCenter() {
+        return { x: this.x / this.world.scale, y: this.y / this.world.scale }
+    }
+
+    render(drawCallback) {
+        push()
+        translate(width / 2, height / 2)
+        scale(this.zoom)
+        translate(-this.x, -this.y) // Just shift by camera x and y, no inversion
+        drawCallback()
+        pop()
+    }
+}
+
+// Update PhysicsGroup to auto-register on id set
+class PhysicsGroup {
+    constructor() {
+        this._id = null
+        this.fill = "#14151f"
+        this.type = "static"
+        this.density = 1.0
+        this.width = 1
+        this.height = 1
+        this.stroke = "#bababa"
+        this.strokeWeight = 0.25
+        this.borderRadius = 0
+        this.bodies = []
+    }
+
+    // When id is set, automatically register in world.groups
+    set id(value) {
+        this._id = value
+        // If id is set and world is defined, register this group
+        if (value && typeof world !== "undefined" && world) {
+            world.groups[value] = this
+        }
+    }
+
+    get id() {
+        return this._id
+    }
+
+    instantiate(physicsWorld, x, y) {
+        return new Body(x, y, this.width, this.height, {
+            id: this.id,
+            fill: this.fill,
+            type: this.type,
+            density: this.density,
+            group: this,
+            stroke: this.stroke,
+            strokeWeight: this.strokeWeight,
+            borderRadius: this.borderRadius,
+        })
+    }
+
+    add(x, y, w, h, attributes = {}) {
+        const mergedAttributes = {
+            id: this.id,
+            fill: this.fill,
+            type: this.type,
+            density: this.density,
+            group: this,
+            stroke: this.stroke,
+            strokeWeight: this.strokeWeight,
+            borderRadius: this.borderRadius,
+            width: w || this.width,
+            height: h || this.height,
+            ...attributes,
+        }
+
+        const body = new Body(x, y, mergedAttributes.width, mergedAttributes.height, mergedAttributes)
+        for (const [key, value] of Object.entries(attributes)) {
+            if (!(key in body)) {
+                body[key] = value
+            }
+        }
+        this.bodies.push(body)
+        return body
+    }
+}
+
+// Update TileMap to use world.groups
+class TileMap {
+    constructor(tileSize, mapData) {
+        this.physicsWorld = world
+        this.tileSize = tileSize
+        this.mapData = mapData
+
+        world.tilesX = mapData[0]?.length || 0
+        world.tilesY = mapData.length
+
+        for (let row = 0; row < mapData.length; row++) {
+            const line = mapData[row]
+            for (let col = 0; col < line.length; col++) {
+                const ch = line[col]
+                if (ch === "." || ch === " ") continue
+
+                // Now we look up the group in world.groups
+                const group = world.groups[ch]
+                if (group instanceof PhysicsGroup) {
+                    group.instantiate(
+                        this.physicsWorld,
+                        col * this.tileSize + this.tileSize / 2,
+                        row * this.tileSize + this.tileSize / 2
+                    )
+                } else {
+                    console.warn(`No PhysicsGroup found with ID: ${ch}`)
+                }
+            }
+        }
+    }
+}
+
+T5.prototype.backgroundGrid = function (spacing) {
+    world._gridEnabled = spacing
+}
+T5.prototype._drawBackgroundGrid = function (spacing) {
+    const startX = -width / 2
+    const startY = -height / 2
+
+    let gridWidth = int(world.tilesX * spacing || width) - 1
+    let gridHeight = int(world.tilesY * spacing || height) - 1
+
+    const endX = startX + gridWidth
+    const endY = startY + gridHeight
+
+    for (let x = startX; x <= endX; x += spacing) {
+        for (let y = startY; y <= endY; y += spacing) {
+            noFill()
+            rectMode(CORNER)
+            stroke(119, 119, 119, 47)
+            strokeWeight(0.25)
+            rect(x, y, spacing, spacing)
+        }
+    }
+}
