@@ -4,26 +4,44 @@
 T5.addOns.input = ($, p, globalScope) => {
     globalScope = window
     // Define constants
-    $.defineConstant('UP_ARROW', 38);
-    $.defineConstant('DOWN_ARROW', 40);
-    $.defineConstant('LEFT_ARROW', 37);
-    $.defineConstant('RIGHT_ARROW', 39);
-    $.defineConstant('SHIFT', 16);
-    $.defineConstant('TAB', 9);
-    $.defineConstant('BACKSPACE', 8);
-    $.defineConstant('ENTER', 13);
-    $.defineConstant('RETURN', 13);
-    $.defineConstant('ALT', 18);
-    $.defineConstant('OPTION', 18);
-    $.defineConstant('CONTROL', 17);
-    $.defineConstant('DELETE', 46);
-    $.defineConstant('ESCAPE', 27);
+    const keyCodes = {
+        UP_ARROW: 38,
+        DOWN_ARROW: 40,
+        LEFT_ARROW: 37,
+        RIGHT_ARROW: 39,
+        SHIFT: 16,
+        TAB: 9,
+        BACKSPACE: 8,
+        ENTER: 13,
+        RETURN: 13,
+        ALT: 18,
+        OPTION: 18,
+        CONTROL: 17,
+        DELETE: 46,
+        ESCAPE: 27,
+        SPACE: 32
+    };
 
-    $.defineConstant('ARROW', 'default');
-    $.defineConstant('CROSS', 'crosshair');
-    $.defineConstant('HAND', 'pointer');
-    $.defineConstant('MOVE', 'move');
-    $.defineConstant('TEXT', 'text');
+    const cursorTypes = {
+        ARROW: 'default',
+        CROSS: 'crosshair',
+        HAND: 'pointer',
+        MOVE: 'move',
+        TEXT: 'text'
+    };
+
+    Object.entries(keyCodes).forEach(([key, value]) => {
+        $[key] = value;
+    });
+
+    Object.entries(cursorTypes).forEach(([key, value]) => {
+        $[key] = value;
+    });
+
+    for (let i = 65; i <= 90; i++) {
+        const keyName = `KEY_${String.fromCharCode(i)}`; // KEY_A, KEY_B, ...
+        $[keyName] = i;
+    }
 
     // Initialize properties
     $.keysPressed = new Set();
@@ -176,9 +194,9 @@ T5.addOns.input = ($, p, globalScope) => {
         if (e.changedTouches) return;
 
         const { canvasMetrics } = $;
-       // if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
-            $._calculateCanvasMetrics();
-      //  }
+        // if (!canvasMetrics || window.innerWidth !== canvasMetrics.width || window.innerHeight !== canvasMetrics.height) {
+        $._calculateCanvasMetrics();
+        //  }
         if (!$.canvasMetrics) { return; }
         const { offsetX, offsetY, scaleX, scaleY, rect } = $.canvasMetrics;
         const scrollX = window.scrollX || window.pageXOffset;
