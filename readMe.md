@@ -112,7 +112,7 @@ sketch.draw = function() {
     sketch.background(255);
 };
 
-```
+```  
 
 ### Physics
 
@@ -120,12 +120,13 @@ sketch.draw = function() {
 
 The T5.js physics add on is still in development, but you can already use it for simple experiments. There is demo project in the examples folder.
 
-T5.js physics is powered by [matter-js](https://brm.io/matter-js/)
+T5.js physics is powered by [planck.js](https://piqnt.com/planck.js/docs/collision)
 
-To Use physics you will have to include Matter-js in your project dependencies, by either downloading it or via cdn;
+To Use physics you will have to include planck.js and t5physics.js in your project dependencies, by either downloading them it or via cdn;
 
 ```html
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.20.0/matter.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/Tezumie/T5.js@latest/T5/t5physics.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/planck-js@latest/dist/planck.js"></script>
 ```
 
 ### Contributing
